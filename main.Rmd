@@ -1,0 +1,247 @@
+---
+title: "main"
+output: html_document
+date: "2026-03-24"
+---
+
+This is the main page of our project.
+
+# We will start by loading the related libraries:
+
+```{r}
+library(TCGAbiolinks)
+library(enrichplot)
+library(ggplot2)
+library(SummarizedExperiment)
+library(tidyverse)
+library(GEOquery)
+library(DESeq2)
+library(EnhancedVolcano)
+library(clusterProfiler)
+# this is the pathway library for a human (for GSEA)
+library(org.Hs.eg.db)
+library(msigdbr)
+library(patchwork)
+```
+
+# now let us access our data
+```{r}
+Bio.LIHC.query <- GDCquery(project = "TCGA-LIHC", 
+                      data.category = "Transcriptome Profiling",
+                      data.type = "Gene Expression Quantification",
+                      experimental.strategy = "RNA-Seq")
+Bio.LIHC.query.res <- getResults(Bio.LIHC.query)
+```
+
+
+# download
+```{r}
+options(timeout=1000)
+
+GDCdownload(Bio.LIHC.query, directory = "./")
+Bio.LIHC.data <- GDCprepare(Bio.LIHC.query, directory = "./")
+```
+
+# get LIHC metadata
+```{r}
+Bio.LIHC.metadata <- colData(Bio.LIHC.data)
+Bio.LIHC.metadata_df <- as.data.frame(Bio.LIHC.metadata)
+```
+
+# check the data
+```{r}
+# NA values:
+NAcolls <- colnames(Bio.LIHC.metadata_df)[sapply(Bio.LIHC.metadata_df, function(x) any(is.na(x)))]
+# note that the definition of the sample has no NA so we will not clean anything for now
+
+# amount of normal and cancerous samples:
+normalSampleCount <- sum(Bio.LIHC.metadata_df$shortLetterCode == "NT")
+TumorSampleCount <- sum(Bio.LIHC.metadata_df$shortLetterCode == "TP")
+
+# total samples:
+SampleCount <- length(Bio.LIHC.metadata_df$shortLetterCode)
+
+# that doesnt add up!
+notNormal_or_Tumor <- rownames(Bio.LIHC.metadata_df)[Bio.LIHC.metadata_df$shortLetterCode != "NT" & Bio.LIHC.metadata_df$shortLetterCode != "TP"]
+
+Bio.LIHC.metadata_df[notNormal_or_Tumor, "shortLetterCode"]
+
+# that is a reccurent tumor, which we don't want to deal with so i will remove them
+Bio.LIHC.clean_metadata_df <- Bio.LIHC.metadata_df[Bio.LIHC.metadata_df$shortLetterCode != "TR",]
+
+# how many NA are in the cancer stage?
+cancerStageCountNA <- sum(is.na(Bio.LIHC.clean_metadata_df$ajcc_pathologic_stage))
+
+# there are a lot of NA in there, so we will try some workarounds
+
+
+
+```
+# get the counts data
+```{r}
+counts.LIHC <- assay(Bio.LIHC.data)
+clean_counts.LIHC <- counts.LIHC[,rownames(Bio.LIHC.clean_metadata_df)]
+
+# check if everything is ready for DESeq
+all(rownames(Bio.LIHC.clean_metadata_df) == colnames(clean_counts.LIHC))
+sum(is.na(Bio.LIHC.clean_metadata_df$shortLetterCode))
+
+```
+# create DESeq object and perform DEseq
+```{r}
+LIHC.dds <- DESeqDataSetFromMatrix(
+                              countData = clean_counts.LIHC,
+                              colData = Bio.LIHC.clean_metadata_df,
+                              design = ~ shortLetterCode
+)
+LIHC.dds <- LIHC.dds[(rowSums(counts(LIHC.dds)) >= 10), ]
+```
+
+# define reference level
+```{r}
+LIHC.dds$shortLetterCode <- relevel(LIHC.dds$shortLetterCode, ref = "NT")
+```
+# run DESeq
+```{r}
+LIHC.dds <- DESeq(LIHC.dds)
+resultsNames(LIHC.dds)
+```
+# get resaults
+```{r}
+res_TP_vs_NT.LFC <- lfcShrink(LIHC.dds, coef = "shortLetterCode_TP_vs_NT", type = "apeglm")
+
+# clear the genes of their version number (important so GSEA will know what to do and so we can add the gene symbol)
+
+rownames(res_TP_vs_NT.LFC) <- gsub("\\..*", "", rownames(res_TP_vs_NT.LFC))
+
+# add symbols so we can "easily" interpret the genes
+# Add gene symbols
+res_TP_vs_NT.LFC$symbol <- mapIds(org.Hs.eg.db,
+                        keys = rownames(res_TP_vs_NT.LFC),
+                        column = "SYMBOL",
+                        keytype = "ENSEMBL",
+                        multiVals = "first")
+```
+# perform pca to visualize 
+```{r}
+counts.vst.LIHC <- DESeq2::vst(LIHC.dds, blind = TRUE)
+
+pcaData.LIHC <- DESeq2::plotPCA(counts.vst.LIHC, ntop = 1000, intgroup = c("shortLetterCode"), returnData = TRUE)
+```
+
+#visualize
+```{r}
+percentVar <- round(100 * attr(pcaData.LIHC, "percentVar"))
+plot <- ggplot(pcaData.LIHC, aes(x=PC1, y=PC2, color=shortLetterCode)) + geom_point(size = 3) + labs(
+       subtitle = "Each point is a patient's gene expression profile",
+       x = paste0("PC1 (", percentVar[1], "% Variance)"),
+       y = paste0("PC2 (", percentVar[2], "% Variance)"))
+plot
+# looks awesome!
+```
+
+# now lets perform GSEA
+# sort the genes by differentiallity
+```{r}
+# get differentiallity
+oredered_genes.tumor_sample <- res_TP_vs_NT.LFC$log2FoldChange
+
+# check for NA
+sum(is.na(oredered_genes.tumor_sample))
+
+# give names (cause thats just what you gotta do)
+names(oredered_genes.tumor_sample) <- rownames(res_TP_vs_NT.LFC)
+
+# order
+oredered_genes.tumor_sample <- sort(oredered_genes.tumor_sample, decreasing = TRUE)
+
+
+
+```
+# look at the volcano plot
+```{r fig.width=8, fig.height=8}
+
+EnhancedVolcano::EnhancedVolcano(res_TP_vs_NT.LFC,
+                lab = res_TP_vs_NT.LFC$symbol,
+                x = 'log2FoldChange',
+                y = 'padj',
+                labSize = 3,
+                FCcutoff = 5, 
+                pCutoff = 0.00001,
+                title = 'Tumor vs non tumor sample')
+
+sort(res_TP_vs_NT.LFC$log2FoldChange, decreasing = TRUE)
+```
+lets look at some genes with high log_2 fold change and p value:
+TERT - an important gene that helps in the production of telomerase which when activated, allows cell reproduction to continue (this is a highly expressed gene in most cancer, so a good sign)
+
+CPLX2 - this is actually a cognitive related gene, that low expression of points to neorological decline (high expressivity seems not connected, but doesnt necciseraly mean anything)
+
+LINC01419 - from what i read this gene literally just ruins everything and helps the cancer. in the nucleus it supresses tumor supressing genes. and it ruins somehow the DNA repair, which also helps tumor grow (one could say that the cancer is here because of the high expression, but im not going to take that jump)
+
+# perform GSEA (hallmark sets)
+```{r}
+hallmark <- msigdbr(species = "Homo sapiens", category = "H") %>% dplyr::select(gs_name, ensembl_gene)
+gseaHallmark_res.tumor_sample <- GSEA(geneList = oredered_genes.tumor_sample,
+                                      pvalueCutoff = 0.05,
+                                      nPermSimple = 10000,
+                                      TERM2GENE = hallmark,
+                                      verbose = FALSE, 
+                                      eps = 0)
+```
+
+# visualize
+```{r}
+dotplot(gseaHallmark_res.tumor_sample, showCategory = 10, split=".sign", 
+        title = "tumor sample enriched patways") +
+   theme_minimal(base_size = 6) + facet_grid(. ~ .sign)
+```
+# so there are really enriched and supressed genes (mostly supressed it seems). but we want to specifically look at the effect on immune pathways
+
+
+```{r}
+enrichplot_Inflammatory_response <- enrichplot::gseaplot2(gseaHallmark_res.tumor_sample, 
+                      geneSetID = "HALLMARK_INFLAMMATORY_RESPONSE", 
+                      title = "Inflammatory response")
+
+enrichplot_Interferon_alpha_response <- enrichplot::gseaplot2(gseaHallmark_res.tumor_sample, 
+                      geneSetID = "HALLMARK_INTERFERON_ALPHA_RESPONSE",
+                      title = "Interfron alpha response")
+
+enrichplot_Interferon_gamma_response <- enrichplot::gseaplot2(gseaHallmark_res.tumor_sample, 
+                      geneSetID = "HALLMARK_INTERFERON_GAMMA_RESPONSE",
+                      title = "Interfron gamma response")
+
+enrichplot_TNFA_signaling <- enrichplot::gseaplot2(gseaHallmark_res.tumor_sample, 
+                      geneSetID = "HALLMARK_TNFA_SIGNALING_VIA_NFKB",
+                      title = "TNFA signaling")
+
+
+enrichplot_combined = enrichplot::gseaplot2(gseaHallmark_res.tumor_sample, 
+                      geneSetID = c("HALLMARK_INFLAMMATORY_RESPONSE",
+                                    "HALLMARK_INTERFERON_ALPHA_RESPONSE",
+                                    "HALLMARK_INTERFERON_GAMMA_RESPONSE",
+                                    "HALLMARK_TNFA_SIGNALING_VIA_NFKB"
+                                    ),
+                      title = "TNFA signaling")
+enrichplot_Inflammatory_response
+enrichplot_Interferon_alpha_response
+enrichplot_Interferon_gamma_response
+enrichplot_TNFA_signaling
+```
+all four pathways are an integral part of the immune system. When looking at the enrichment score graph, we can see that the genes are differentally supressed in the tumor microenvironment. In this case, we say that the tumor is "cold" meaning, it supresses immune activity.
+
+# lets check the log2 fold change and p value for some immune cells and proteins, just to make sure they are supressed
+
+```{r fig.width=8, fig.height=8}
+EnhancedVolcano::EnhancedVolcano(res_TP_vs_NT.LFC,
+                lab = res_TP_vs_NT.LFC$symbol,
+                selectLab = c("CD274", "PDCD1", "PDCD1LG2"),
+                x = 'log2FoldChange',
+                y = 'padj',
+                labSize = 3,
+                FCcutoff = 5, 
+                pCutoff = 0.00001,
+                title = 'Tumor vs non tumor sample')
+```
+# now to the xCell analysis
