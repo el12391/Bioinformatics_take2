@@ -22,6 +22,8 @@ library(clusterProfiler)
 library(org.Hs.eg.db)
 library(msigdbr)
 library(patchwork)
+library(xCell2)
+library(pheatmap)
 ```
 
 # now let us access our data
@@ -179,9 +181,9 @@ CPLX2 - this is actually a cognitive related gene, that low expression of points
 
 LINC01419 - from what i read this gene literally just ruins everything and helps the cancer. in the nucleus it supresses tumor supressing genes. and it ruins somehow the DNA repair, which also helps tumor grow (one could say that the cancer is here because of the high expression, but im not going to take that jump)
 
-# perform GSEA (hallmark sets)
+# perform GSEA (general hallmark sets for a human)
 ```{r}
-hallmark <- msigdbr(species = "Homo sapiens", category = "H") %>% dplyr::select(gs_name, ensembl_gene)
+hallmark <- msigdbr(species = "Homo sapiens") %>% dplyr::select(gs_name, ensembl_gene)
 gseaHallmark_res.tumor_sample <- GSEA(geneList = oredered_genes.tumor_sample,
                                       pvalueCutoff = 0.05,
                                       nPermSimple = 10000,
@@ -192,11 +194,28 @@ gseaHallmark_res.tumor_sample <- GSEA(geneList = oredered_genes.tumor_sample,
 
 # visualize
 ```{r}
-dotplot(gseaHallmark_res.tumor_sample, showCategory = 10, split=".sign", 
+dotplot(gseaHallmark_res.tumor_sample, showCategory = 10, split = ".sign", 
         title = "tumor sample enriched patways") +
    theme_minimal(base_size = 6) + facet_grid(. ~ .sign)
 ```
 # so there are really enriched and supressed genes (mostly supressed it seems). but we want to specifically look at the effect on immune pathways
+
+```{r}
+#hallmark_immune <- msigdbr(species = "Homo sapiens", category = "C7", subcategory = "IMMUNESIGDB") %>% dplyr::select(gs_name, ensembl_gene)
+#gseaHallmark_immune_res.tumor_sample <- GSEA(geneList = oredered_genes.tumor_sample,
+#                                      pvalueCutoff = 0.05,
+#                                      nPermSimple = 10000,
+#                                      TERM2GENE = hallmark_immune,
+#                                      verbose = FALSE, 
+#                                      eps = 0)
+```
+# visualize
+```{r}
+
+#dotplot(gseaHallmark_immune_res.tumor_sample, showCategory = 10, split=".sign", 
+#        title = "tumor sample enriched patways") +
+#   theme_minimal(base_size = 6) + facet_grid(. ~ .sign)
+```
 
 
 ```{r}
@@ -229,19 +248,71 @@ enrichplot_Interferon_alpha_response
 enrichplot_Interferon_gamma_response
 enrichplot_TNFA_signaling
 ```
-all four pathways are an integral part of the immune system. When looking at the enrichment score graph, we can see that the genes are differentally supressed in the tumor microenvironment. In this case, we say that the tumor is "cold" meaning, it supresses immune activity.
+all four pathways are an integral part of the immune system. When looking at the enrichment score graph, we can see that the genes are differentially suppressed in the tumor microenvironment. In this case, we say that the tumor is "cold" meaning, it suppresses immune activity.
 
-# lets check the log2 fold change and p value for some immune cells and proteins, just to make sure they are supressed
 
-```{r fig.width=8, fig.height=8}
-EnhancedVolcano::EnhancedVolcano(res_TP_vs_NT.LFC,
-                lab = res_TP_vs_NT.LFC$symbol,
-                selectLab = c("CD274", "PDCD1", "PDCD1LG2"),
-                x = 'log2FoldChange',
-                y = 'padj',
-                labSize = 3,
-                FCcutoff = 5, 
-                pCutoff = 0.00001,
-                title = 'Tumor vs non tumor sample')
-```
 # now to the xCell analysis
+so we know that the immune system is suppressed around this tumor. but we want to know exactly what cells are suppressed. for that we use xCell2 and its immune reference.
+
+```{r}
+# first we get the normalized  counts from the differential expression
+normalized_counts_matrix.LIHC <- counts(LIHC.dds, normalized = TRUE)
+sum(is.na(rownames(normalized_counts_matrix.LIHC)))
+# remove version number
+rownames(normalized_counts_matrix.LIHC) <- gsub("\\..*", "", rownames(normalized_counts_matrix.LIHC))
+# make symbol
+gene_symbols <- mapIds(org.Hs.eg.db,
+                        keys = rownames(normalized_counts_matrix.LIHC),
+                        column = "SYMBOL",
+                        keytype = "ENSEMBL",
+                        multiVals = "first")
+
+rownames(normalized_counts_matrix.LIHC) <- gene_symbols[rownames(normalized_counts_matrix.LIHC)]
+# no error! that's a relief. lets check for NA
+sum(is.na(rownames(normalized_counts_matrix.LIHC)))
+# thats a lot of na, so lets get them out
+clean_normalized_counts_matrix.LIHC <- normalized_counts_matrix.LIHC[!is.na(rownames(normalized_counts_matrix.LIHC)),]
+sum(is.na(rownames(clean_normalized_counts_matrix.LIHC)))
+```
+# start the actual analysis
+```{r}
+# load immune reference
+data(ImmuneCompendium.xCell2Ref, package = "xCell2")
+
+# run analysis
+xCell_immune_res.LIHC <- xCell2Analysis(mix = clean_normalized_counts_matrix.LIHC,
+                               xcell2object = ImmuneCompendium.xCell2Ref)
+```
+# lets visualize the results
+```{r fig.width=8, fig.height=8}
+# we need an "annotation col" for some reason
+annotation_col <- data.frame(Condition = Bio.LIHC.clean_metadata_df$shortLetterCode)
+rownames(annotation_col) <- rownames(Bio.LIHC.clean_metadata_df)
+
+# order the samples by sample type
+ordered_for_heatmap <- rownames(Bio.LIHC.clean_metadata_df)[order(Bio.LIHC.clean_metadata_df$shortLetterCode)]
+ordered_xCell2_res <- xCell_immune_res.LIHC[, ordered_for_heatmap]
+pheatmap(ordered_xCell2_res, 
+         annotation_col = annotation_col,
+         scale = "row",
+         show_colnames = FALSE,
+         cluster_rows = TRUE,
+         cluster_cols = FALSE,
+         breaks = seq(-2, 2, length.out = 100),
+         cutree_rows = 5,
+         main = "xCell2 cell type heatmap")
+```
+we see a clear immune deregulation in the tumor samples compared to the non tumor samples.
+especially in:
+- granulocyte
+- natural killer cell
+- monocyte
+- neutrophil
+- plasmacytoid dendritic cell
+- non classical monocyte
+- eosinophil
+- classical nonocyte
+- basophil
+and more with names too long.
+by looking at the hierarcial clustering and cutoff, we can see that all supressed immune cells are closely related to each other. and by asking gemini (don't know what else i can use), these are all cells that are a big part of the "innate immune system" whos job is to be the "first line of defense" when there is some type of attack.
+When the Innate Immune System is activated for too long, the Adaptive Immune System comes in. But with the Innate Immune System being active in normal samples and not tumor ones could point maybe towards an immune response, but not where the tumor is.
