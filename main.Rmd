@@ -417,10 +417,6 @@ rownames(sc_data_2_raw) <- sc_data_2_raw[, 1]
 sc_data_2_clean <- sc_data_2_raw[, -1]
 sc_data_2_sparse <- as(as.matrix(sc_data_2_clean), "dgCMatrix")
 
-# clean up memory
-rm(sc_data_2_raw, sc_data_2_clean)
-gc()
-
 seu_2 <- CreateSeuratObject(counts = sc_data_2_sparse, project = "GSE149614", min.cells = 3, min.features = 200)
 
 # merge and filter out low quality cells
