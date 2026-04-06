@@ -12,13 +12,11 @@ output:
     toc: true
 ---
 
-```{r, include=FALSE}
+```{r-knitr, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE, fig.path = "Figures/")
 ```
 
-
-# We will start by loading the related libraries:
-```{r}
+```{r-libraries}
 library(clusterProfiler)
 library(data.table)
 library(DESeq2)
@@ -66,17 +64,6 @@ library(xCell2)
 **Alternative considered**: 
 
 **Why we rejected the alternative**: 
-
-
-### 2.3 Decision checkpoint #2:
-
-**The decision**: 
-
-**Why we chose it**: 
-
-**Alternative considered**: 
-
-**Why we rejected the alternative**:
 
 
 ### 2.4 Code:
@@ -399,7 +386,21 @@ When the Innate Immune System is activated for too long, the Adaptive Immune Sys
 
 **Biological reasoning**: 
 
-```{r}
+
+### 2.3 Decision checkpoint #2:
+
+**The decision**: 
+
+**Why we chose it**: 
+
+**Alternative considered**: 
+
+**Why we rejected the alternative**:
+
+
+### 3.2 Code:
+
+```{r-harmony}
 # load 1st dataset
 sc_data_1 <- ReadMtx(
   mtx = "Data/scRNA_GSE140228/matrix.mtx",
@@ -459,7 +460,7 @@ We examined the UMAP and CD8A FeaturePlot to localize the T-cell compartment, an
 
 
 ### 3.3 Code:
-```{r}
+```{r-lr}
 target_clusters <- c(0, 1, 6, 14, 17)
 
 # join all layers
@@ -497,7 +498,7 @@ dotplot(ego_results, showCategory = 15, label_format = 40) +
 Now, we will examine if our target T-cells actively co-express classical exhaustion markers. 
 We will also test if this overall exhaustion signature is significantly stronger in the tumor environment compared to normal tissue:
 
-```{r}
+```{r-results}
 exhaustion_list <- list(c("PDCD1", "LAG3", "HAVCR2", "TIGIT", "CTLA4", "TOX", "LAYN"))
 
 seu_merged <- AddModuleScore(
