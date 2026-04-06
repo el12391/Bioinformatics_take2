@@ -12,7 +12,7 @@ output:
     toc: true
 ---
 
-```{r knit, include=FALSE}
+```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE, fig.path = "Figures/")
 ```
 
