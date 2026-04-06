@@ -1,30 +1,85 @@
 ---
-title: "main"
-output: html_document
-date: "2026-03-24"
+title: "Transcriptomic Signatures of Innate Immune Suppression and T-Cell Exhaustion in Hepatocellular Carcinoma"
+author: "Re'em Melamed-Katz (213874373), Eliav Katzenstein (326986668)"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    theme: united
+    highlight: tango
+  pdf_document:
+    toc: true
 ---
 
-This is the main page of our project.
+```{r, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE, fig.path = "Figures/")
+```
+
 
 # We will start by loading the related libraries:
-
 ```{r}
-library(TCGAbiolinks)
-library(enrichplot)
-library(ggplot2)
-library(SummarizedExperiment)
-library(tidyverse)
-library(GEOquery)
+library(clusterProfiler)
+library(data.table)
 library(DESeq2)
 library(EnhancedVolcano)
-library(clusterProfiler)
-# this is the pathway library for a human (for GSEA)
-library(org.Hs.eg.db)
+library(enrichplot)
+library(GEOquery)
+library(ggplot2)
+library(ggpubr)
+library(harmony)
+library(Matrix)
 library(msigdbr)
+library(org.Hs.eg.db) # this is the pathway library for a human (for GSEA)
 library(patchwork)
-library(xCell2)
 library(pheatmap)
+library(RColorBrewer)
+library(Seurat)
+library(SummarizedExperiment)
+library(TCGAbiolinks)
+library(tidyverse)
+library(xCell2)
 ```
+
+***
+
+## 1. Abstract (300 words in english)
+
+
+***
+
+## 2. Main analysis: Bulk RNA-seq
+
+### 2.1 Prediction #1:
+
+**Prediction**: 
+
+**Biological reasoning**: 
+
+
+### 2.2 Decision checkpoint #1:
+
+**The decision**: 
+
+**Why we chose it**: 
+
+**Alternative considered**: 
+
+**Why we rejected the alternative**: 
+
+
+### 2.3 Decision checkpoint #2:
+
+**The decision**: 
+
+**Why we chose it**: 
+
+**Alternative considered**: 
+
+**Why we rejected the alternative**:
+
+
+### 2.4 Code:
 
 # now let us access our data
 ```{r}
@@ -79,6 +134,7 @@ cancerStageCountNA <- sum(is.na(Bio.LIHC.clean_metadata_df$ajcc_pathologic_stage
 
 
 ```
+
 # get the counts data
 ```{r}
 counts.LIHC <- assay(Bio.LIHC.data)
@@ -89,6 +145,7 @@ all(rownames(Bio.LIHC.clean_metadata_df) == colnames(clean_counts.LIHC))
 sum(is.na(Bio.LIHC.clean_metadata_df$shortLetterCode))
 
 ```
+
 # create DESeq object and perform DEseq
 ```{r}
 LIHC.dds <- DESeqDataSetFromMatrix(
@@ -103,11 +160,13 @@ LIHC.dds <- LIHC.dds[(rowSums(counts(LIHC.dds)) >= 10), ]
 ```{r}
 LIHC.dds$shortLetterCode <- relevel(LIHC.dds$shortLetterCode, ref = "NT")
 ```
+
 # run DESeq
 ```{r}
 LIHC.dds <- DESeq(LIHC.dds)
 resultsNames(LIHC.dds)
 ```
+
 # get resaults
 ```{r}
 res_TP_vs_NT.LFC <- lfcShrink(LIHC.dds, coef = "shortLetterCode_TP_vs_NT", type = "apeglm")
@@ -124,6 +183,7 @@ res_TP_vs_NT.LFC$symbol <- mapIds(org.Hs.eg.db,
                         keytype = "ENSEMBL",
                         multiVals = "first")
 ```
+
 # perform pca to visualize 
 ```{r}
 counts.vst.LIHC <- DESeq2::vst(LIHC.dds, blind = TRUE)
@@ -131,7 +191,7 @@ counts.vst.LIHC <- DESeq2::vst(LIHC.dds, blind = TRUE)
 pcaData.LIHC <- DESeq2::plotPCA(counts.vst.LIHC, ntop = 1000, intgroup = c("shortLetterCode"), returnData = TRUE)
 ```
 
-#visualize
+# visualize
 ```{r}
 percentVar <- round(100 * attr(pcaData.LIHC, "percentVar"))
 plot <- ggplot(pcaData.LIHC, aes(x=PC1, y=PC2, color=shortLetterCode)) + geom_point(size = 3) + labs(
@@ -209,6 +269,7 @@ dotplot(gseaHallmark_res.tumor_sample, showCategory = 10, split = ".sign",
 #                                      verbose = FALSE, 
 #                                      eps = 0)
 ```
+
 # visualize
 ```{r}
 
@@ -274,6 +335,7 @@ sum(is.na(rownames(normalized_counts_matrix.LIHC)))
 clean_normalized_counts_matrix.LIHC <- normalized_counts_matrix.LIHC[!is.na(rownames(normalized_counts_matrix.LIHC)),]
 sum(is.na(rownames(clean_normalized_counts_matrix.LIHC)))
 ```
+
 # start the actual analysis
 ```{r}
 # load immune reference
@@ -283,6 +345,7 @@ data(ImmuneCompendium.xCell2Ref, package = "xCell2")
 xCell_immune_res.LIHC <- xCell2Analysis(mix = clean_normalized_counts_matrix.LIHC,
                                xcell2object = ImmuneCompendium.xCell2Ref)
 ```
+
 # lets visualize the results
 ```{r fig.width=8, fig.height=8}
 # we need an "annotation col" for some reason
@@ -302,6 +365,7 @@ pheatmap(ordered_xCell2_res,
          cutree_rows = 5,
          main = "xCell2 cell type heatmap")
 ```
+
 we see a clear immune deregulation in the tumor samples compared to the non tumor samples.
 especially in:
 - granulocyte
@@ -316,3 +380,172 @@ especially in:
 and more with names too long.
 by looking at the hierarcial clustering and cutoff, we can see that all supressed immune cells are closely related to each other. and by asking gemini (don't know what else i can use), these are all cells that are a big part of the "innate immune system" whos job is to be the "first line of defense" when there is some type of attack.
 When the Innate Immune System is activated for too long, the Adaptive Immune System comes in. But with the Innate Immune System being active in normal samples and not tumor ones could point maybe towards an immune response, but not where the tumor is.
+
+
+### 2.5 Results:
+
+**Result comparison (prediction #1)**: 
+
+**Biological Integration**:
+
+
+***
+
+## 3. Secondary analysis: scRNA-Seq
+
+### 3.1 Prediction #2
+
+**Prediction**: 
+
+**Biological reasoning**: 
+
+```{r}
+# load 1st dataset
+sc_data_1 <- ReadMtx(
+  mtx = "Data/scRNA_GSE140228/matrix.mtx",
+  cells = "Data/scRNA_GSE140228/barcodes.tsv",
+  features = "Data/scRNA_GSE140228/features.tsv",
+  skip.feature = 1
+)
+seu_1 <- CreateSeuratObject(counts = sc_data_1, project = "GSE140228", min.cells = 3, min.features = 200)
+
+# load 2nd dataset
+file_path_2 <- "Data/scRNA_GSE149614/GSE149614_HCC.scRNAseq.S71915.count.txt"
+sc_data_2_raw <- fread(file_path_2, data.table = FALSE, select = 1:3001)
+rownames(sc_data_2_raw) <- sc_data_2_raw[, 1]
+sc_data_2_clean <- sc_data_2_raw[, -1]
+sc_data_2_sparse <- as(as.matrix(sc_data_2_clean), "dgCMatrix")
+
+# clean up memory
+rm(sc_data_2_raw, sc_data_2_clean)
+gc()
+
+seu_2 <- CreateSeuratObject(counts = sc_data_2_sparse, project = "GSE149614", min.cells = 3, min.features = 200)
+
+# merge and filter out low quality cells
+seu_merged <- merge(seu_1, y = seu_2, add.cell.ids = c("DS1", "DS2"), project = "HCC_Integrated")
+seu_merged[["percent.mt"]] <- PercentageFeatureSet(seu_merged, pattern = "^MT-")
+seu_merged <- subset(seu_merged, subset = nFeature_RNA > 200 & nFeature_RNA < 5000 & percent.mt < 10)
+
+# pipeline and Harmony batch correction
+seu_merged <- NormalizeData(seu_merged) %>% 
+              FindVariableFeatures() %>% 
+              ScaleData() %>% 
+              RunPCA() %>% 
+              RunHarmony(group.by.vars = "orig.ident")
+
+# clustering and UMAP
+seu_merged <- FindNeighbors(seu_merged, reduction = "harmony", dims = 1:15)
+seu_merged <- FindClusters(seu_merged, resolution = 0.5)
+seu_merged <- RunUMAP(seu_merged, reduction = "harmony", dims = 1:15)
+
+# visual check plots
+DimPlot(seu_merged, reduction = "umap", label = TRUE) + ggtitle("Cluster Map")
+FeaturePlot(seu_merged, features = "CD8A") + ggtitle("CD8+ T-cell Localization")
+```
+
+We examined the UMAP and CD8A FeaturePlot to localize the T-cell compartment, and identified clusters 0, 1, 6, 14, 17 as our target populations.
+
+
+### 3.2 Decision checkpoint #3: cluster characterization method
+
+**The decision**: We chose to use logistic regression with dataset integration.
+
+**Why we chose it**: Although we integrated our datasets using Harmony, Harmony only corrects the low dimensional embedding (PCA and UMAP) to allow for shared clustering. It does not modify the underlying gene expression matrix. By using logistic regression with latent.vars = "orig.ident", we can explicitly account for and neutralize the batch effects (technical variation between the two studies) during the actual marker discovery. This ensures our markers are biologically driven by cell type and not artifacts of different laboratories.
+
+**Alternative considered**: Wilcoxon rank-sum test.
+
+**Why we rejected the alternative**: The Wilcoxon test is a non-parametric test that compares ranks but cannot incorporate covariates. Using it on merged datasets without accounting for batch effects often leads to "false positive" markers that represent dataset differences rather than true cell-type biology.
+
+
+### 3.3 Code:
+```{r}
+target_clusters <- c(0, 1, 6, 14, 17)
+
+# join all layers
+seu_merged <- JoinLayers(seu_merged)
+
+# extract our T-cell group markers
+t_markers <- FindMarkers(seu_merged, 
+                         ident.1 = target_clusters, 
+                         test.use = "LR", 
+                         latent.vars = "orig.ident", 
+                         only.pos = TRUE, 
+                         min.pct = 0.25)
+
+# keep only the significant genes
+sig_genes <- rownames(t_markers[t_markers$p_val_adj < 0.05 & t_markers$avg_log2FC > 0.5, ])
+
+# GO
+ego_results <- enrichGO(gene          = sig_genes,
+                        OrgDb         = org.Hs.eg.db,
+                        keyType       = 'SYMBOL',
+                        ont           = "BP", 
+                        pAdjustMethod = "BH",
+                        pvalueCutoff  = 0.05)
+
+dotplot(ego_results, showCategory = 15, label_format = 40) + 
+  theme_bw() + 
+  scale_color_gradient(low = "red", high = "blue") +
+  ggtitle("Functional Enrichment: CD8+ T-cell Compartment") +
+  theme(
+    plot.title = element_text(hjust = 0.5, face = "bold"),
+    axis.text.y = element_text(size = 8)
+  )
+```
+
+Now, we will examine if our target T-cells actively co-express classical exhaustion markers. 
+We will also test if this overall exhaustion signature is significantly stronger in the tumor environment compared to normal tissue:
+
+```{r}
+exhaustion_list <- list(c("PDCD1", "LAG3", "HAVCR2", "TIGIT", "CTLA4", "TOX", "LAYN"))
+
+seu_merged <- AddModuleScore(
+  object = seu_merged,
+  features = exhaustion_list,
+  name = "T_Cell_Exhaustion_Score"
+)
+
+exhaustion_markers <- c("CD8A", "PDCD1", "LAG3", "HAVCR2", "TIGIT", "TOX")
+
+p1 <- DotPlot(seu_merged, features = exhaustion_markers, idents = target_clusters) +
+  scale_colour_gradientn(colours = rev(brewer.pal(n = 11, name = "RdYlBu"))) +
+  labs(title = "Marker Expression in T-cell Clusters", x = "Genes", y = "Cluster") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+p2 <- FeaturePlot(seu_merged, features = "T_Cell_Exhaustion_Score1") +
+  scale_colour_gradientn(colours = rev(brewer.pal(n = 11, name = "RdBu"))) +
+  ggtitle("Global T-Cell Exhaustion Score")
+
+meta_ds1 <- read.delim("Data/scRNA_GSE140228/GSE140228_UMI_counts_Droplet_cellinfo.tsv", header = TRUE, stringsAsFactors = FALSE)
+rownames(meta_ds1) <- paste0("DS1_", meta_ds1$Barcode)
+condition_ds1 <- meta_ds1[, "Tissue", drop = FALSE]
+colnames(condition_ds1) <- "Condition"
+
+meta_ds2 <- read.delim("Data/scRNA_GSE149614/GSE149614_HCC.metadata.updated.txt", header = TRUE, stringsAsFactors = FALSE)
+rownames(meta_ds2) <- paste0("DS2_", meta_ds2$Cell)
+condition_ds2 <- meta_ds2[, "site", drop = FALSE]
+colnames(condition_ds2) <- "Condition"
+
+combined_meta <- rbind(condition_ds1, condition_ds2)
+seu_merged <- AddMetaData(seu_merged, metadata = combined_meta)
+
+seu_merged$Condition[seu_merged$Condition == "Adjacent"] <- "Normal"
+
+seu_filtered <- subset(seu_merged, subset = Condition %in% c("Tumor", "Normal"))
+
+p3 <- VlnPlot(seu_filtered, features = "T_Cell_Exhaustion_Score1", 
+              idents = target_clusters, group.by = "Condition", pt.size = 0) +
+  ggtitle("Exhaustion Score: Normal vs Tumor") +
+  stat_compare_means(method = "wilcox.test")
+
+print(p1)
+print(p2)
+print(p3)
+```
+
+### 3.4 Results:
+
+**Result comparison (prediction #2)**: 
+
+**Biological Integration**:
