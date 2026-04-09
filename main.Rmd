@@ -313,7 +313,8 @@ enrichplot_TNFA_signaling
 all four pathways are an integral part of the immune system. When looking at the enrichment score graph, we can see that the genes are differentially suppressed in the tumor microenvironment. In this case, we say that the tumor is "cold" meaning, it suppresses immune activity.
 
 
-# now to the xCell analysis
+now to the xCell analysis:
+
 so we know that the immune system is suppressed around this tumor. but we want to know exactly what cells are suppressed. for that we use xCell2 and its immune reference.
 
 ```{r}
