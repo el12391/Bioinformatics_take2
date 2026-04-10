@@ -444,25 +444,15 @@ response, but not where the tumor is.
 
 **Biological Integration**:
 
-------------------------------------------------------------------------
+***
 
 ## 3. Secondary analysis: scRNA-Seq
 
 ### 3.1 Prediction #2
 
-**Prediction**:
+**Prediction**: CD8+ T-cells infiltrating the tumor microenvironment will express a high level of T-cell exhaustion markers compared to T-cells in normal adjacent tissue.
 
-**Biological reasoning**:
-
-### 2.3 Decision checkpoint #2:
-
-**The decision**:
-
-**Why we chose it**:
-
-**Alternative considered**:
-
-**Why we rejected the alternative**:
+**Biological reasoning**: In cancer, continuous exposure to tumor antigens causes T-cells to enter a state of exhaustion. As T-cells become exhausted, they lose their ability to kill target cells and upregulate multiple inhibitory receptors, including PD-1 (PDCD1), LAG-3, and TIGIT. Since hepatocellular carcinoma provides a constant antigen source, we expect CD8+ T-cells within the tumor to co-express these exhaustion markers compared to cells in the healthy adjacent tissue.
 
 ### 3.2 Code:
 
@@ -476,17 +466,37 @@ sc_data_1 <- ReadMtx(
 )
 seu_1 <- CreateSeuratObject(counts = sc_data_1, project = "GSE140228", min.cells = 3, min.features = 200)
 
+rm(sc_data_1)
+gc()
+
 # load 2nd dataset
 file_path_2 <- "Data/scRNA_GSE149614/GSE149614_HCC.scRNAseq.S71915.count.txt"
 sc_data_2_raw <- fread(file_path_2, data.table = FALSE, select = 1:3001)
 rownames(sc_data_2_raw) <- sc_data_2_raw[, 1]
 sc_data_2_clean <- sc_data_2_raw[, -1]
-sc_data_2_sparse <- as(as.matrix(sc_data_2_clean), "dgCMatrix")
+
+rm(sc_data_2_raw) 
+gc()
+
+sc_data_2_matrix <- as.matrix(sc_data_2_clean)
+rm(sc_data_2_clean)
+gc()
+
+sc_data_2_sparse <- as(sc_data_2_matrix, "dgCMatrix")
+rm(sc_data_2_matrix)
+gc()
 
 seu_2 <- CreateSeuratObject(counts = sc_data_2_sparse, project = "GSE149614", min.cells = 3, min.features = 200)
 
+rm(sc_data_2_sparse) 
+gc()
+
 # merge and filter out low quality cells
 seu_merged <- merge(seu_1, y = seu_2, add.cell.ids = c("DS1", "DS2"), project = "HCC_Integrated")
+
+rm(seu_1, seu_2)
+gc()
+
 seu_merged[["percent.mt"]] <- PercentageFeatureSet(seu_merged, pattern = "^MT-")
 seu_merged <- subset(seu_merged, subset = nFeature_RNA > 200 & nFeature_RNA < 5000 & percent.mt < 10)
 
@@ -505,77 +515,34 @@ seu_merged <- RunUMAP(seu_merged, reduction = "harmony", dims = 1:15)
 # visual check plots
 DimPlot(seu_merged, reduction = "umap", label = TRUE) + ggtitle("Cluster Map")
 FeaturePlot(seu_merged, features = "CD8A") + ggtitle("CD8+ T-cell Localization")
+
 ```
 
-We examined the UMAP and CD8A FeaturePlot to localize the T-cell
-compartment, and identified clusters 0, 1, 6, 14, 17 as our target
-populations.
+We examined the UMAP and CD8A FeaturePlot to localize the T-cell compartment, and identified clusters 0, 1, 6, 14, 17 as our target populations.
 
-### 3.2 Decision checkpoint #3: cluster characterization method
 
-**The decision**: We chose to use logistic regression with dataset
-integration.
+### 3.3 Decision checkpoint #3: cluster characterization method
 
-**Why we chose it**: Although we integrated our datasets using Harmony,
-Harmony only corrects the low dimensional embedding (PCA and UMAP) to
-allow for shared clustering. It does not modify the underlying gene
-expression matrix. By using logistic regression with latent.vars =
-"orig.ident", we can explicitly account for and neutralize the batch
-effects (technical variation between the two studies) during the actual
-marker discovery. This ensures our markers are biologically driven by
-cell type and not artifacts of different laboratories.
+**The decision**: We calculated an aggregated module score (using Seurat's AddModuleScore) based on a predefined list of exhaustion genes instead of analyzing individual markers.
 
-**Alternative considered**: Wilcoxon rank-sum test.
+**Why we chose it**: Single-cell RNA-seq data contains many technical dropouts. Aggregating the signal from multiple exhaustion markers creates a more stable cell-level metric, reducing technical noise.
 
-**Why we rejected the alternative**: The Wilcoxon test is a
-non-parametric test that compares ranks but cannot incorporate
-covariates. Using it on merged datasets without accounting for batch
-effects often leads to "false positive" markers that represent dataset
-differences rather than true cell-type biology.
+**Alternative considered**: Comparing the expression of a single exhaustion marker like PDCD1 between normal and tumor cells.
 
-### 3.3 Code:
 
-```{r lr}
+**Why we rejected the alternative**: Looking at a single gene in scRNA-seq data leads to high false-negative rates. Many true exhausted T-cells might have zero counts for PDCD1 due to sequencing limitations, which would hurt our statistical power.
+
+
+### 3.4 Code:
+
+```{r results}
 target_clusters <- c(0, 1, 6, 14, 17)
+
+seu_merged <- subset(seu_merged, downsample = 500)
 
 # join all layers
 seu_merged <- JoinLayers(seu_merged)
 
-# extract our T-cell group markers
-t_markers <- FindMarkers(seu_merged, 
-                         ident.1 = target_clusters, 
-                         test.use = "LR", 
-                         latent.vars = "orig.ident", 
-                         only.pos = TRUE, 
-                         min.pct = 0.25)
-
-# keep only the significant genes
-sig_genes <- rownames(t_markers[t_markers$p_val_adj < 0.05 & t_markers$avg_log2FC > 0.5, ])
-
-# GO
-ego_results <- enrichGO(gene          = sig_genes,
-                        OrgDb         = org.Hs.eg.db,
-                        keyType       = 'SYMBOL',
-                        ont           = "BP", 
-                        pAdjustMethod = "BH",
-                        pvalueCutoff  = 0.05)
-
-dotplot(ego_results, showCategory = 15, label_format = 40) + 
-  theme_bw() + 
-  scale_color_gradient(low = "red", high = "blue") +
-  ggtitle("Functional Enrichment: CD8+ T-cell Compartment") +
-  theme(
-    plot.title = element_text(hjust = 0.5, face = "bold"),
-    axis.text.y = element_text(size = 8)
-  )
-```
-
-Now, we will examine if our target T-cells actively co-express classical
-exhaustion markers. We will also test if this overall exhaustion
-signature is significantly stronger in the tumor environment compared to
-normal tissue:
-
-```{r results}
 exhaustion_list <- list(c("PDCD1", "LAG3", "HAVCR2", "TIGIT", "CTLA4", "TOX", "LAYN"))
 
 seu_merged <- AddModuleScore(
@@ -622,8 +589,8 @@ print(p2)
 print(p3)
 ```
 
-### 3.4 Results:
+### 3.5 Results:
 
-**Result comparison (prediction #2)**:
+**Result comparison (prediction #2)**: The scRNA-seq results support our prediction. The DotPlot shows that CD8+ T-cell clusters (specifically 14 and 17) co-express the inhibitory receptors we checked: PDCD1 (PD-1), HAVCR2 (TIM-3), and TIGIT, along with the transcription factor TOX. The VlnPlot confirms that the overall T-Cell Exhaustion Score is significantly higher in the tumor microenvironment than in normal adjacent tissue (Wilcoxon test, $p < 2.2e-16$). This demonstrates that T-cells inside the tumor are in an exhausted state.
 
-**Biological Integration**:
+**Biological Integration**: Our findings point to a specific immune evasion mechanism in HCC. Even though CD8+ T-cells manage to infiltrate the tumor, the local environment suppresses their activity. By upregulating inhibitory receptors like PD-1 and TIM-3, the tumor blocks the T-cells' ability to attack cancer cells. Ultimately, this explains how the tumor continues to grow even after an adaptive immune response has been triggered.
