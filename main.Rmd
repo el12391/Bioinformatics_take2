@@ -44,7 +44,7 @@ library(xCell2)
 
 ***
 
-## 1. Abstract (300 words in english)
+## 1. Abstract
 
 ***
 
@@ -229,6 +229,7 @@ plot
 # looks awesome!
 ```
 
+
 ### Pathway Enrichment Analysis
 
 **Decision checkpoint #3: Pathway Analysis Tool**
@@ -309,7 +310,6 @@ pathways
 #        title = "tumor sample enriched patways") +
 #   theme_minimal(base_size = 6) + facet_grid(. ~ .sign)
 ```
-
 
 **Prediction #1: Immune Pathway Activity**
 
@@ -453,6 +453,7 @@ response, but not where the tumor is.
 * **Prediction**: CD8+ T-cells infiltrating the tumor microenvironment will express a high level of T-cell exhaustion markers compared to T-cells in normal adjacent tissue.
 * **Biological reasoning**: In cancer, continuous exposure to tumor antigens causes T-cells to enter a state of exhaustion. As T-cells become exhausted, they lose their ability to kill target cells and upregulate multiple inhibitory receptors, including PD-1 (PDCD1), LAG-3, and TIGIT. Since hepatocellular carcinoma provides a constant antigen source, we expect CD8+ T-cells within the tumor to co-express these exhaustion markers compared to cells in the healthy adjacent tissue.
 
+
 ### Data Processing and Integration
 
 ```{r harmony}
@@ -519,6 +520,7 @@ FeaturePlot(seu_merged, features = "CD8A") + ggtitle("CD8+ T-cell Localization")
 
 We examined the UMAP and CD8A FeaturePlot to localize the T-cell compartment, and identified clusters 0, 1, 6, 14, 17 as our target populations.
 
+
 ### Cluster Characterization and Analysis
 
 **Decision checkpoint #4: cluster characterization method**
@@ -581,6 +583,7 @@ print(p1)
 print(p2)
 print(p3)
 ```
+
 
 ### Results: scRNA-Seq
 
