@@ -352,7 +352,8 @@ looking at the enrichment score graph, we can see that the genes are
 differentially suppressed in the tumor microenvironment. In this case,
 we say that the tumor is "cold" meaning, it suppresses immune activity.
 
-### Tumor Microenvironment Deconvolution (xCell)
+
+### Tumor Microenvironment Deconvolution
 
 **Prediction #2: Immune Cell Suppression**
 
