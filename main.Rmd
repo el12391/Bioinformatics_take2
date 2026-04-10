@@ -266,13 +266,6 @@ oredered_genes.tumor_sample <- sort(oredered_genes.tumor_sample, decreasing = TR
 
 ```
 
-**Decision checkpoint #4: Statistical Significance**
-
-* **The decision**: A p-value of 0.05 was chosen.
-* **Why we chose it**: It was chosen as a standard p-value for statistical significance.
-* **Alternative considered**: *(complete)*
-* **Why we rejected the alternative**: *(complete)*
-
 A p-value of 0.05 was chosen as a standard p-value for statistical significance.
 
 ```{r}
@@ -527,7 +520,7 @@ We examined the UMAP and CD8A FeaturePlot to localize the T-cell compartment, an
 
 ### Cluster Characterization and Analysis
 
-**Decision checkpoint #5: cluster characterization method**
+**Decision checkpoint #4: cluster characterization method**
 
 * **The decision**: We calculated an aggregated module score (using Seurat's AddModuleScore) based on a predefined list of exhaustion genes instead of analyzing individual markers.
 * **Why we chose it**: Single-cell RNA-seq data contains many technical dropouts. Aggregating the signal from multiple exhaustion markers creates a more stable cell-level metric, reducing technical noise.
