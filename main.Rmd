@@ -50,24 +50,20 @@ library(xCell2)
 
 ## 2. Main analysis: Bulk RNA-seq
 
-### 2.1 Decision checkpoint #1: Dataset Selection
+### Data Acquisition and Preprocessing
 
-**The decision**: TCGA-LIHC as the dataset.
+**Decision checkpoint #1: Dataset Selection**
 
-**Why we chose it**: It is crucial, seeing as it is very general and comprehensive with many samples (though only with 50 normal samples).
-
-**Alternative considered**: GSE-144269.
-
-**Why we rejected the alternative**: Seeing as it was smaller and only had patients with prior HepD that interfered with the results.
+* **The decision**: TCGA-LIHC as the dataset.
+* **Why we chose it**: It is crucial, seeing as it is very general and comprehensive with many samples (though only with 50 normal samples).
+* **Alternative considered**: GSE-144269.
+* **Why we rejected the alternative**: Seeing as it was smaller and only had patients with prior HepD that interfered with the results.
 
 This is actually the first decision checkpoint. The choice of TCGA-LIHC
 as the dataset is crucial, seeing as it is very general and
 comprehensive with many samples (though only with 50 normal samples). An
 alternative we had was GSE-144269. But seeing as it was smaller and only
 had patients with prior HepD that interfered with the results.
-
-
-### 2.2 Code:
 
 ```{r}
 # get the data
@@ -131,20 +127,15 @@ sum(is.na(Bio.LIHC.clean_metadata_df$shortLetterCode))
 
 ```
 
-### 2.3 Decision checkpoint #2: Differential Expression Tool
 
-**The decision**: We decided to use DESeq2 as our differential expression tool.
+### Differential Expression Analysis
 
-**Why we chose it**: It is the one we were most familiar with, a standard and reliable tool.
+**Decision checkpoint #2: Differential Expression Tool**
 
-**Alternative considered**: Preferred DESeq2 for familiarity.
-
-We decided to use DESeq2 as our differential expression tool because it
-is the one we were most familiar with, a standard and reliable tool. One
-alternative for this size of dataset was edgeR, but
-
-
-### 2.4 Code:
+* **The decision**: We decided to use DESeq2 as our differential expression tool.
+* **Why we chose it**: It is the one we were most familiar with, a standard and reliable tool.
+* **Alternative considered**: edgeR.
+* **Why we rejected the alternative**: Preferred DESeq2 for familiarity.
 
 ```{r}
 # create DESeq object and perform DEseq
@@ -156,20 +147,20 @@ LIHC.dds <- DESeqDataSetFromMatrix(
 LIHC.dds <- LIHC.dds[(rowSums(counts(LIHC.dds)) >= 10), ]
 ```
 
-#### define reference level
+**define reference level**
 
 ```{r}
 LIHC.dds$shortLetterCode <- relevel(LIHC.dds$shortLetterCode, ref = "NT")
 ```
 
-#### run DESeq
+**run DESeq**
 
 ```{r}
 LIHC.dds <- DESeq(LIHC.dds)
 resultsNames(LIHC.dds)
 ```
 
-#### get resaults
+**get results**
 
 ```{r}
 res_TP_vs_NT.LFC <- lfcShrink(LIHC.dds, coef = "shortLetterCode_TP_vs_NT", type = "apeglm")
@@ -187,7 +178,7 @@ res_TP_vs_NT.LFC$symbol <- mapIds(org.Hs.eg.db,
                         multiVals = "first")
 ```
 
-#### look at the volcano plot
+**look at the volcano plot**
 
 ```{r fig.width=8, fig.height=8}
 
@@ -218,7 +209,7 @@ genes. and it ruins somehow the DNA repair, which also helps tumor grow
 (one could say that the cancer is here because of the high expression,
 but im not going to take that jump)
 
-#### perform pca to visualize
+**perform pca to visualize**
 
 ```{r}
 counts.vst.LIHC <- DESeq2::vst(LIHC.dds, blind = TRUE)
@@ -226,7 +217,7 @@ counts.vst.LIHC <- DESeq2::vst(LIHC.dds, blind = TRUE)
 pcaData.LIHC <- DESeq2::plotPCA(counts.vst.LIHC, ntop = 1000, intgroup = c("shortLetterCode"), returnData = TRUE)
 ```
 
-#### visualize
+**visualize**
 
 ```{r}
 percentVar <- round(100 * attr(pcaData.LIHC, "percentVar"))
@@ -238,15 +229,14 @@ plot
 # looks awesome!
 ```
 
-### 2.5 Desicion checkpoint #3: Pathway Analysis Tool
+### Pathway Enrichment Analysis
 
-**The decision**: GSEA is an excellent tool for the job.
+**Decision checkpoint #3: Pathway Analysis Tool**
 
-**Why we chose it**: Seeing as we want to check the immune pathways (as in, know a lot about a little). By choosing specific pathways (as seen later), we can see excatly how and how much is that pathway differentially expressed.
-
-**Alternative considered**: ORA.
-
-**Why we rejected the alternative**: It is much less sophisticated and robust, and it is much more suited for quick small answers, while we need this as a robust and main part of our analysis.
+* **The decision**: GSEA is an excellent tool for the job.
+* **Why we chose it**: Seeing as we want to check the immune pathways (as in, know a lot about a little). By choosing specific pathways (as seen later), we can see excatly how and how much is that pathway differentially expressed.
+* **Alternative considered**: ORA.
+* **Why we rejected the alternative**: It is much less sophisticated and robust, and it is much more suited for quick small answers, while we need this as a robust and main part of our analysis.
 
 Seeing as we want to check the immune pathways (as in, know a lot about
 a little), GSEA is an excellent tool for the job. By choosing specific
@@ -256,12 +246,8 @@ less sophisticated and robust, and it is much more suited for quick
 small answers, while we need this as a robust and main part of our
 analysis.
 
-
-### 2.6 Code:
-
-#### GSEA
-
 ```{r}
+# GSEA
 # sort the genes by differentiallity
 
 # get differentiallity
@@ -280,22 +266,14 @@ oredered_genes.tumor_sample <- sort(oredered_genes.tumor_sample, decreasing = TR
 
 ```
 
+**Decision checkpoint #4: Statistical Significance**
 
-### 2.6 Decision checkpoint #4: Statistical Significance
+* **The decision**: A p-value of 0.05 was chosen.
+* **Why we chose it**: It was chosen as a standard p-value for statistical significance.
+* **Alternative considered**: *(complete)*
+* **Why we rejected the alternative**: *(complete)*
 
-**The decision**: A p-value of 0.05 was chosen.
-
-**Why we chose it**: It was chosen as a standard p-value for statistical significance.
-
-**Alternative considered**: *(complete)*
-
-**Why we rejected the alternative**: *(complete)*
-
-A p-value of 0.05 was chosen as a standard p-value for statistical
-significance
-
-
-### 2.7 Code:
+A p-value of 0.05 was chosen as a standard p-value for statistical significance.
 
 ```{r}
 # perform GSEA (using hallmark sets for a human)
@@ -330,7 +308,7 @@ pathways
 #                                      eps = 0)
 ```
 
-visualize
+**visualize**
 
 ```{r}
 
@@ -340,18 +318,10 @@ visualize
 ```
 
 
-### 2.8 Prediction #1
+**Prediction #1: Immune Pathway Activity**
 
-**Prediction**: The enrichment score of the 4 selected immune pathways can go both ways. We would assume that there will be variance, meaning the immune pathways are either supressed or activated.
-
-**Biological reasoning**:  As learned during the tutorials, this will point towards the tumor being "hot" or "cold" meaning an active immune environment and a supressed immune environment respectively.
-
-A prediction of the enrichment score of these 4 immune pathways can go both ways.
-We would assume that there will be variance, meaning the immune pathways are either supressed or activated.
-As learned during the tutorials, this will point towards the tumor being "hot" or "cold" meaning an active immune environment and a supressed immune environment respectively.
-
-
-### 2.9 Code:
+* **Prediction**: The enrichment score of the 4 selected immune pathways can go both ways. We would assume that there will be variance, meaning the immune pathways are either supressed or activated.
+* **Biological reasoning**: As learned during the tutorials, this will point towards the tumor being "hot" or "cold" meaning an active immune environment and a supressed immune environment respectively.
 
 ```{r}
 enrichplot_Inflammatory_response <- enrichplot::gseaplot2(gseaHallmark_res.tumor_sample, 
@@ -389,7 +359,18 @@ looking at the enrichment score graph, we can see that the genes are
 differentially suppressed in the tumor microenvironment. In this case,
 we say that the tumor is "cold" meaning, it suppresses immune activity.
 
-#### xCell analysis
+### Tumor Microenvironment Deconvolution (xCell)
+
+**Prediction #2: Immune Cell Suppression**
+
+* **Prediction**: Seeing as the 4 immune pathways we chose are suppressed around the tumor, we would assume that all if not some of the immune cells connected to that pathway would be supressed.
+Inflammatory Response: "Macrophages", "Neutrophils", "T-Cells", "B-Cells", "NK-Cells", "D-Cells"
+Interfron Alpha Response: "NK-Cells", "B-Cells", "T-Cells", "D-Cells"
+Interfron Gamma Response: "Macrophages", "T Helper Cells", "CD8+ Cytotoxic T-Cells", "NK-Cells", "B-Cells", "D-Cells"
+TNFA signaling: "Macrophages", "T-Cells", "B-Cells", "NK-Cells", "Fibroblasts", "Keratinocytes"
+* **Biological reasoning**: We know that the immune system is suppressed around this tumor, but we want to know exactly what cells are suppressed. For that we map the pathways to their cell types using xCell2 and its immune reference.
+
+**xCell analysis**
 
 so we know that the immune system is suppressed around this tumor. but
 we want to know exactly what cells are suppressed. for that we use
@@ -416,8 +397,6 @@ clean_normalized_counts_matrix.LIHC <- normalized_counts_matrix.LIHC[!is.na(rown
 sum(is.na(rownames(clean_normalized_counts_matrix.LIHC)))
 ```
 
-
-
 ```{r}
 # start the actual analysis
 
@@ -428,20 +407,6 @@ data(ImmuneCompendium.xCell2Ref, package = "xCell2")
 xCell_immune_res.LIHC <- xCell2Analysis(mix = clean_normalized_counts_matrix.LIHC,
                                xcell2object = ImmuneCompendium.xCell2Ref)
 ```
-
-
-### 2.10 Prediction #2: Immune Cell Suppression
-
-**Prediction**: Seeing as the 4 immune pathways we chose are suppressed around the tumor, we would assume that all if not some of the immune cells connected to that pathway would be supressed.
-Inflammatory Response: "Macrophages", "Neutrophils", "T-Cells", "B-Cells", "NK-Cells", "D-Cells"
-Interfron Alpha Response: "NK-Cells", "B-Cells", "T-Cells", "D-Cells"
-Interfron Gamma Response: "Macrophages", "T Helper Cells", "CD8+ Cytotoxic T-Cells", "NK-Cells", "B-Cells", "D-Cells"
-TNFA signaling: "Macrophages", "T-Cells", "B-Cells", "NK-Cells", "Fibroblasts", "Keratinocytes"
-
-**Biological reasoning**: We know that the immune system is suppressed around this tumor, but we want to know exactly what cells are suppressed. For that we map the pathways to their cell types using xCell2 and its immune reference.
-
-
-### 2.11 Code:
 
 ```{r fig.width=8, fig.height=8}
 # lets visualize the results
@@ -465,10 +430,10 @@ pheatmap(ordered_xCell2_res,
 ```
 
 
-### 2.12 Results:
-**Result comparison (prediction #1 & #2)**: we see a clear immune deactivation in the tumor samples compared to the non tumor samples, when looking at: granulocyte, natural killer cell, monocyte, neutrophil, plasmacytoid dendritic cell, non classical monocyte, eosinophil, classical nonocyte, basophil and more with names too long.
+### Results: Bulk RNA-seq
 
-**Biological Integration**: by looking at the hierarcial clustering and cutoff, we can see that all supressed immune cells are closely related to each other. and by asking gemini (don't know what else i can use), these are all cells that are a big part of the "innate immune system" who's job is to be the "first line of defense" when there is some type of attack. When the Innate Immune System is activated for too long, the Adaptive Immune System comes in. But with the Innate Immune System being active in normal samples and not tumor ones could point maybe towards an immune response, but not where the tumor is.
+* **Result comparison (prediction #1 & #2)**: we see a clear immune deactivation in the tumor samples compared to the non tumor samples, when looking at: granulocyte, natural killer cell, monocyte, neutrophil, plasmacytoid dendritic cell, non classical monocyte, eosinophil, classical nonocyte, basophil and more with names too long.
+* **Biological Integration**: by looking at the hierarcial clustering and cutoff, we can see that all supressed immune cells are closely related to each other. and by asking gemini (don't know what else i can use), these are all cells that are a big part of the "innate immune system" who's job is to be the "first line of defense" when there is some type of attack. When the Innate Immune System is activated for too long, the Adaptive Immune System comes in. But with the Innate Immune System being active in normal samples and not tumor ones could point maybe towards an immune response, but not where the tumor is.
 
 we see a clear immune deactivation in the tumor samples compared to the
 non tumor samples, when looking at: - granulocyte - natural killer cell -
@@ -489,13 +454,12 @@ response, but not where the tumor is.
 
 ## 3. Secondary analysis: scRNA-Seq
 
-### 3.1 Prediction #3
+**Prediction #3: T-cell Exhaustion**
 
-**Prediction**: CD8+ T-cells infiltrating the tumor microenvironment will express a high level of T-cell exhaustion markers compared to T-cells in normal adjacent tissue.
+* **Prediction**: CD8+ T-cells infiltrating the tumor microenvironment will express a high level of T-cell exhaustion markers compared to T-cells in normal adjacent tissue.
+* **Biological reasoning**: In cancer, continuous exposure to tumor antigens causes T-cells to enter a state of exhaustion. As T-cells become exhausted, they lose their ability to kill target cells and upregulate multiple inhibitory receptors, including PD-1 (PDCD1), LAG-3, and TIGIT. Since hepatocellular carcinoma provides a constant antigen source, we expect CD8+ T-cells within the tumor to co-express these exhaustion markers compared to cells in the healthy adjacent tissue.
 
-**Biological reasoning**: In cancer, continuous exposure to tumor antigens causes T-cells to enter a state of exhaustion. As T-cells become exhausted, they lose their ability to kill target cells and upregulate multiple inhibitory receptors, including PD-1 (PDCD1), LAG-3, and TIGIT. Since hepatocellular carcinoma provides a constant antigen source, we expect CD8+ T-cells within the tumor to co-express these exhaustion markers compared to cells in the healthy adjacent tissue.
-
-### 3.2 Code:
+### Data Processing and Integration
 
 ```{r harmony}
 # load 1st dataset
@@ -561,20 +525,14 @@ FeaturePlot(seu_merged, features = "CD8A") + ggtitle("CD8+ T-cell Localization")
 
 We examined the UMAP and CD8A FeaturePlot to localize the T-cell compartment, and identified clusters 0, 1, 6, 14, 17 as our target populations.
 
+### Cluster Characterization and Analysis
 
-### 3.3 Decision checkpoint #4: cluster characterization method
+**Decision checkpoint #5: cluster characterization method**
 
-**The decision**: We calculated an aggregated module score (using Seurat's AddModuleScore) based on a predefined list of exhaustion genes instead of analyzing individual markers.
-
-**Why we chose it**: Single-cell RNA-seq data contains many technical dropouts. Aggregating the signal from multiple exhaustion markers creates a more stable cell-level metric, reducing technical noise.
-
-**Alternative considered**: Comparing the expression of a single exhaustion marker like PDCD1 between normal and tumor cells.
-
-
-**Why we rejected the alternative**: Looking at a single gene in scRNA-seq data leads to high false-negative rates. Many true exhausted T-cells might have zero counts for PDCD1 due to sequencing limitations, which would hurt our statistical power.
-
-
-### 3.4 Code:
+* **The decision**: We calculated an aggregated module score (using Seurat's AddModuleScore) based on a predefined list of exhaustion genes instead of analyzing individual markers.
+* **Why we chose it**: Single-cell RNA-seq data contains many technical dropouts. Aggregating the signal from multiple exhaustion markers creates a more stable cell-level metric, reducing technical noise.
+* **Alternative considered**: Comparing the expression of a single exhaustion marker like PDCD1 between normal and tumor cells.
+* **Why we rejected the alternative**: Looking at a single gene in scRNA-seq data leads to high false-negative rates. Many true exhausted T-cells might have zero counts for PDCD1 due to sequencing limitations, which would hurt our statistical power.
 
 ```{r results}
 target_clusters <- c(0, 1, 6, 14, 17)
@@ -630,8 +588,7 @@ print(p2)
 print(p3)
 ```
 
-### 3.5 Results:
+### Results: scRNA-Seq
 
-**Result comparison (prediction #3)**: The scRNA-seq results support our prediction. The DotPlot shows that CD8+ T-cell clusters (specifically 14 and 17) co-express the inhibitory receptors we checked: PDCD1 (PD-1), HAVCR2 (TIM-3), and TIGIT, along with the transcription factor TOX. The VlnPlot confirms that the overall T-Cell Exhaustion Score is significantly higher in the tumor microenvironment than in normal adjacent tissue (Wilcoxon test, $p < 2.2e-16$). This demonstrates that T-cells inside the tumor are in an exhausted state.
-
-**Biological Integration**: Our findings point to a specific immune evasion mechanism in HCC. Even though CD8+ T-cells manage to infiltrate the tumor, the local environment suppresses their activity. By upregulating inhibitory receptors like PD-1 and TIM-3, the tumor blocks the T-cells' ability to attack cancer cells. Ultimately, this explains how the tumor continues to grow even after an adaptive immune response has been triggered.
+* **Result comparison (prediction #3)**: The scRNA-seq results support our prediction. The DotPlot shows that CD8+ T-cell clusters (specifically 14 and 17) co-express the inhibitory receptors we checked: PDCD1 (PD-1), HAVCR2 (TIM-3), and TIGIT, along with the transcription factor TOX. The VlnPlot confirms that the overall T-Cell Exhaustion Score is significantly higher in the tumor microenvironment than in normal adjacent tissue (Wilcoxon test, $p < 2.2e-16$). This demonstrates that T-cells inside the tumor are in an exhausted state.
+* **Biological Integration**: Our findings point to a specific immune evasion mechanism in HCC. Even though CD8+ T-cells manage to infiltrate the tumor, the local environment suppresses their activity. By upregulating inhibitory receptors like PD-1 and TIM-3, the tumor blocks the T-cells' ability to attack cancer cells. Ultimately, this explains how the tumor continues to grow even after an adaptive immune response has been triggered.
