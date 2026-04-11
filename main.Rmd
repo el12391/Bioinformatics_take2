@@ -48,7 +48,7 @@ library(xCell2)
 Hepatocellular carcinoma (HCC) is the most common liver cancer, and one of the most common cancers overall. It is the third leading cause of cancer related deaths, and is especially common among those with liver disease such as cirrhosis and fibrosis.
 A better understanding of the immune system and its mechanisms in the tumor microenvironment are needed for better research and understanding of this cancer. Immunotherapy is an upcoming treatment that could also solve the differences between the HCC stages, so knowing the immune system is integral for treating it.
 We will look at the differential gene expression between stages of the cancer, using normal tissue samples to give us a general view. Differential expression, Pathway and xCell analysis are used to see how the cancer and its stages affect the immune system. Our secondary analysis Using Seurat takes a closer look at CD8+ T cells, which are a vital part of immunotherapy, and general immune related genes.
-Our biggest findings are the inaffect the cancer stage has on the immune microenvironment, the supression of the innate immune system by HCC, and the exhaustion of CD8+ T Cells and PDCD1 (PD-1 encoder).
+Our biggest findings are the inaffect the cancer stage has on the immune microenvironment, the supression of the innate immune system by HCC, and the exhaustion of CD8+ T Cells.
 These findings shine a new light on the current immunotherapy situation, and where energy and research should be directed for better and improved treatments that can be found.
 
 ## 2. Main analysis: Bulk RNA-seq
