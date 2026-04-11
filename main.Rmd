@@ -374,18 +374,22 @@ analysis.
 # get differentiallity
 oredered_genes.Tumor <- res_NT_vs_TP.LFC$log2FoldChange
 oredered_genes.Stage_II <- res_I_vs_II.LFC$log2FoldChange
+oredered_genes.Stage_III <- res_I_vs_III.LFC$log2FoldChange
 
 # check for NA
 sum(is.na(oredered_genes.Tumor))
 sum(is.na(oredered_genes.Stage_II))
+sum(is.na(oredered_genes.Stage_III))
 
 # give names (cause thats just what you gotta do)
 names(oredered_genes.Tumor) <- rownames(res_NT_vs_TP.LFC)
 names(oredered_genes.Stage_II) <- rownames(res_I_vs_II.LFC)
+names(oredered_genes.Stage_III) <- rownames(res_I_vs_III.LFC)
 
 # order
 oredered_genes.Tumor <- sort(oredered_genes.Tumor, decreasing = TRUE)
 oredered_genes.Stage_II <- sort(oredered_genes.Stage_II, decreasing = TRUE)
+oredered_genes.Stage_III <- sort(oredered_genes.Stage_III, decreasing = TRUE)
 
 ```
 ```{r}
@@ -426,11 +430,20 @@ gseaHallmark_res.Stage_II <- GSEA(geneList = oredered_genes.Stage_II,
                                       eps = 0)
 
 ```
+```{r}
+gseaHallmark_res.Stage_III <- GSEA(geneList = oredered_genes.Stage_III,
+                                      pvalueCutoff = 0.05,
+                                      nPermSimple = 10000,
+                                      TERM2GENE = hallmark,
+                                      verbose = FALSE, 
+                                      eps = 0)
+
+```
 
 ```{r}
 # visualize
 
-dotplot(gseaHallmark_res.Stage_II, showCategory = 10, split = ".sign", 
+dotplot(gseaHallmark_res.Tumor, showCategory = 10, split = ".sign", 
         title = "tumor sample enriched patways") +
    theme_minimal(base_size = 6) + facet_grid(. ~ .sign)
 ```
@@ -446,35 +459,89 @@ A prediction of the enrichment score of these 4 immune pathways can go both ways
 We would assume that there will be variance, meaning the immune pathways are either supressed or activated.
 As learned during the tutorials, this will point towards the tumor being "hot" or "cold" meaning an active immune environment and a supressed immune environment respectively.
 ```{r}
-enrichplot_Inflammatory_response <- enrichplot::gseaplot2(gseaHallmark_res.Stage_II, 
+enrichplot_Inflammatory_response_Tumor <- enrichplot::gseaplot2(gseaHallmark_res.Tumor, 
                       geneSetID = "HALLMARK_INFLAMMATORY_RESPONSE", 
-                      title = "Inflammatory response")
+                      title = "Inflammatory response Stage Tumor") 
 
-enrichplot_Interferon_alpha_response <- enrichplot::gseaplot2(gseaHallmark_res.Stage_II, 
+enrichplot_Interferon_alpha_response_Tumor <- enrichplot::gseaplot2(gseaHallmark_res.Tumor, 
                       geneSetID = "HALLMARK_INTERFERON_ALPHA_RESPONSE",
-                      title = "Interfron alpha response")
+                      title = "Interfron alpha response Stage Tumor")
 
-enrichplot_Interferon_gamma_response <- enrichplot::gseaplot2(gseaHallmark_res.Stage_II, 
+enrichplot_Interferon_gamma_response_Tumor <- enrichplot::gseaplot2(gseaHallmark_res.Tumor, 
                       geneSetID = "HALLMARK_INTERFERON_GAMMA_RESPONSE",
-                      title = "Interfron gamma response")
+                      title = "Interfron gamma response Stage Tumor")
 
-enrichplot_TNFA_signaling <- enrichplot::gseaplot2(gseaHallmark_res.Stage_II, 
+enrichplot_TNFA_signaling_Tumor <- enrichplot::gseaplot2(gseaHallmark_res.Tumor, 
                       geneSetID = "HALLMARK_TNFA_SIGNALING_VIA_NFKB",
-                      title = "TNFA signaling")
+                      title = "TNFA signaling Stage Tumor")
 
 
-enrichplot_combined = enrichplot::gseaplot2(gseaHallmark_res.Stage_II, 
-                      geneSetID = c("HALLMARK_INFLAMMATORY_RESPONSE",
-                                    "HALLMARK_INTERFERON_ALPHA_RESPONSE",
-                                    "HALLMARK_INTERFERON_GAMMA_RESPONSE",
-                                    "HALLMARK_TNFA_SIGNALING_VIA_NFKB"
-                                    ),
-                      title = "TNFA signaling")
-enrichplot_Inflammatory_response
-enrichplot_Interferon_alpha_response
-enrichplot_Interferon_gamma_response
-enrichplot_TNFA_signaling
-#enrichplot_combined
+enrichplot_Inflammatory_response_II <- enrichplot::gseaplot2(gseaHallmark_res.Stage_II, 
+                      geneSetID = "HALLMARK_INFLAMMATORY_RESPONSE", 
+                      title = "Inflammatory response Stage II")
+
+enrichplot_Interferon_alpha_response_II <- enrichplot::gseaplot2(gseaHallmark_res.Stage_II, 
+                      geneSetID = "HALLMARK_INTERFERON_ALPHA_RESPONSE",
+                      title = "Interfron alpha response Stage II")
+
+enrichplot_Interferon_gamma_response_II <- enrichplot::gseaplot2(gseaHallmark_res.Stage_II, 
+                      geneSetID = "HALLMARK_INTERFERON_GAMMA_RESPONSE",
+                      title = "Interfron gamma response Stage II")
+
+enrichplot_TNFA_signaling_II <- enrichplot::gseaplot2(gseaHallmark_res.Stage_II, 
+                      geneSetID = "HALLMARK_TNFA_SIGNALING_VIA_NFKB",
+                      title = "TNFA signaling Stage II")
+
+
+enrichplot_Inflammatory_response_III <- enrichplot::gseaplot2(gseaHallmark_res.Stage_III, 
+                      geneSetID = "HALLMARK_INFLAMMATORY_RESPONSE", 
+                      title = "Inflammatory response III")
+
+enrichplot_Interferon_alpha_response_III <- enrichplot::gseaplot2(gseaHallmark_res.Stage_III, 
+                      geneSetID = "HALLMARK_INTERFERON_ALPHA_RESPONSE",
+                      title = "Interfron alpha response III")
+
+enrichplot_Interferon_gamma_response_III <- enrichplot::gseaplot2(gseaHallmark_res.Stage_III, 
+                      geneSetID = "HALLMARK_INTERFERON_GAMMA_RESPONSE",
+                      title = "Interfron gamma response III")
+
+enrichplot_TNFA_signaling_III <- enrichplot::gseaplot2(gseaHallmark_res.Stage_III, 
+                      geneSetID = "HALLMARK_TNFA_SIGNALING_VIA_NFKB",
+                      title = "TNFA signaling III")
+
+
+# add line 
+enrichplot_Inflammatory_response_Tumor[[1]] <- enrichplot_Inflammatory_response_Tumor[[1]] + geom_hline(yintercept = 0, linetype = "solid", color = "black")
+enrichplot_Interferon_alpha_response_Tumor[[1]] <- enrichplot_Interferon_alpha_response_Tumor[[1]] + geom_hline(yintercept = 0, linetype = "solid", color = "black")
+enrichplot_Interferon_gamma_response_Tumor[[1]] <- enrichplot_Interferon_gamma_response_Tumor[[1]] + geom_hline(yintercept = 0, linetype = "solid", color = "black")
+enrichplot_TNFA_signaling_Tumor[[1]] <- enrichplot_TNFA_signaling_Tumor[[1]] + geom_hline(yintercept = 0, linetype = "solid", color = "black")
+
+enrichplot_Inflammatory_response_II[[1]] <- enrichplot_Inflammatory_response_II[[1]] + geom_hline(yintercept = 0, linetype = "solid", color = "black")
+enrichplot_Interferon_alpha_response_II[[1]] <- enrichplot_Interferon_alpha_response_II[[1]] + geom_hline(yintercept = 0, linetype = "solid", color = "black")
+enrichplot_Interferon_gamma_response_II[[1]] <- enrichplot_Interferon_gamma_response_II[[1]] + geom_hline(yintercept = 0, linetype = "solid", color = "black")
+enrichplot_TNFA_signaling_II[[1]] <- enrichplot_TNFA_signaling_II[[1]] + geom_hline(yintercept = 0, linetype = "solid", color = "black")
+
+enrichplot_Inflammatory_response_III[[1]] <- enrichplot_Inflammatory_response_III[[1]] + geom_hline(yintercept = 0, linetype = "solid", color = "black")
+enrichplot_Interferon_alpha_response_III[[1]] <- enrichplot_Interferon_alpha_response_III[[1]] + geom_hline(yintercept = 0, linetype = "solid", color = "black")
+enrichplot_Interferon_gamma_response_III[[1]] <- enrichplot_Interferon_gamma_response_III[[1]] + geom_hline(yintercept = 0, linetype = "solid", color = "black")
+enrichplot_TNFA_signaling_III[[1]] <- enrichplot_TNFA_signaling_III[[1]] + geom_hline(yintercept = 0, linetype = "solid", color = "black")
+
+# show
+enrichplot_Inflammatory_response_Tumor
+enrichplot_Interferon_alpha_response_Tumor
+enrichplot_Interferon_gamma_response_Tumor
+enrichplot_TNFA_signaling_Tumor
+
+enrichplot_Inflammatory_response_II
+enrichplot_Interferon_alpha_response_II
+enrichplot_Interferon_gamma_response_II
+enrichplot_TNFA_signaling_II
+
+enrichplot_Inflammatory_response_III
+enrichplot_Interferon_alpha_response_III
+enrichplot_Interferon_gamma_response_III
+enrichplot_TNFA_signaling_III
+
 ```
 
 all four pathways are an integral part of the immune system. When
@@ -558,12 +625,12 @@ TNFA signaling: "Macrophages", "T-Cells", "B-Cells", "NK-Cells", "Fibroblasts", 
 # lets visualize the results
 
 # we need an "annotation col" for some reason
-annotation_col <- data.frame(Condition = Bio.LIHC.clean_metadata_df$shortLetterCode)
-rownames(annotation_col) <- rownames(Bio.LIHC.clean_metadata_df)
+annotation_col <- data.frame(Condition = Bio.LIHC_shortLetterCode.clean_metadata_df$shortLetterCode)
+rownames(annotation_col) <- rownames(Bio.LIHC_shortLetterCode.clean_metadata_df)
 
 # order the samples by sample type
-ordered_for_heatmap <- rownames(Bio.LIHC.clean_metadata_df)[order(Bio.LIHC.clean_metadata_df$shortLetterCode)]
-ordered_xCell2_res <- xCell_immune_res.LIHC[, ordered_for_heatmap]
+ordered_for_heatmap <- rownames(Bio.LIHC_shortLetterCode.clean_metadata_df)[order(Bio.LIHC_shortLetterCode.clean_metadata_df$shortLetterCode)]
+ordered_xCell2_res <- xCell_immune_res.LIHC_shortLetterCode[, ordered_for_heatmap]
 pheatmap(ordered_xCell2_res, 
          annotation_col = annotation_col,
          scale = "row",
@@ -573,6 +640,25 @@ pheatmap(ordered_xCell2_res,
          breaks = seq(-2, 2, length.out = 100),
          cutree_rows = 5,
          main = "xCell2 cell type heatmap")
+
+annotation_col <- data.frame(Condition = Bio.LIHC_Stage.clean_metadata_df$simplified_stage)
+rownames(annotation_col) <- rownames(Bio.LIHC_Stage.clean_metadata_df)
+
+# order the samples by sample type
+ordered_for_heatmap <- rownames(Bio.LIHC_Stage.clean_metadata_df)[order(Bio.LIHC_Stage.clean_metadata_df$simplified_stage)]
+ordered_xCell2_res <- xCell_immune_res.LIHC_Stage[, ordered_for_heatmap]
+xCell_Stage_plot <- pheatmap(ordered_xCell2_res, 
+         annotation_col = annotation_col,
+         scale = "row",
+         show_colnames = FALSE,
+         cluster_rows = TRUE,
+         cluster_cols = FALSE,
+         breaks = seq(-3, 3, length.out = 100),
+         cutree_rows = 3,
+         main = "xCell2 cell type heatmap")
+
+
+
 ```
 
 we see a clear immune deactivation in the tumor samples compared to the
@@ -589,6 +675,7 @@ When the Innate Immune System is activated for too long, the Adaptive
 Immune System comes in. But with the Innate Immune System being active
 in normal samples and not tumor ones could point maybe towards an immune
 response, but not where the tumor is.
+
 
 ### 2.5 Results:
 
