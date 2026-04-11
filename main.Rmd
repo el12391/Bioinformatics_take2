@@ -122,14 +122,16 @@ Bio.LIHC.metadata_df[notNormal_or_Tumor, "shortLetterCode"]
 Bio.LIHC_shortLetterCode.clean_metadata_df <- Bio.LIHC.metadata_df[Bio.LIHC.metadata_df$shortLetterCode != "TR",]
 
 # how many NA are in the cancer stage?
-sum(is.na(Bio.LIHC.clean_metadata_df$ajcc_pathologic_stage))
+sum(is.na(Bio.LIHC.metadata_df$ajcc_pathologic_stage))
 
 # remove NA for stage analysis
-Bio.LIHC_Stage.clean_metadata_df <- Bio.LIHC.clean_metadata_df[!is.na(Bio.LIHC.clean_metadata_df$ajcc_pathologic_stage),]
+Bio.LIHC_Stage.clean_metadata_df <- Bio.LIHC.metadata_df[!is.na(Bio.LIHC.metadata_df$ajcc_pathologic_stage),]
 
 # simplify stages
 Bio.LIHC_Stage.clean_metadata_df$simplified_stage <- gsub("[ABC]$", "", Bio.LIHC_Stage.clean_metadata_df$ajcc_pathologic_stage)  
 
+# we want to compare only cancer samples when looking at the cancer stage
+Bio.LIHC_Stage.clean_metadata_df <- Bio.LIHC_Stage.clean_metadata_df[Bio.LIHC_Stage.clean_metadata_df$shortLetterCode != "NT", ]
 # how many are there from every stage?
 sum(Bio.LIHC_Stage.clean_metadata_df$simplified_stage == "Stage 0")
 
@@ -149,7 +151,7 @@ Bio.LIHC_Stage.clean_metadata_df <- Bio.LIHC_Stage.clean_metadata_df[Bio.LIHC_St
 # get the Seq counts data
 
 counts.LIHC <- assay(Bio.LIHC.data)
-clean_counts.LIHC_shortLetterCode <- counts.LIHC[,rownames(Bio.LIHC.clean_metadata_df)]
+clean_counts.LIHC_shortLetterCode <- counts.LIHC[,rownames(Bio.LIHC_shortLetterCode.clean_metadata_df)]
 
 clean_counts.LIHC_Stage <- counts.LIHC[,rownames(Bio.LIHC_Stage.clean_metadata_df)]
 
@@ -158,7 +160,7 @@ all(rownames(Bio.LIHC_shortLetterCode.clean_metadata_df) == colnames(clean_count
 
 all(rownames(Bio.LIHC_Stage.clean_metadata_df) == colnames(clean_counts.LIHC_Stage))
 
-sum(is.na(Bio.LIHC.clean_metadata_df$shortLetterCode))
+sum(is.na(Bio.LIHC_shortLetterCode.clean_metadata_df$shortLetterCode))
 sum(is.na(Bio.LIHC_Stage.clean_metadata_df$simplified_stage))
 
 ```
@@ -368,11 +370,10 @@ analysis.
 ```{r}
 # sort the genes by differentiallity
 
-# clean the res
-res_I_vs_II.LFC.Clean <- res_I_vs_II.LFC[res_I_vs_II.LFC$log2FoldChange != 0,]
+
 # get differentiallity
 oredered_genes.Tumor <- res_NT_vs_TP.LFC$log2FoldChange
-oredered_genes.Stage_II <- res_I_vs_II.LFC.Clean$log2FoldChange
+oredered_genes.Stage_II <- res_I_vs_II.LFC$log2FoldChange
 
 # check for NA
 sum(is.na(oredered_genes.Tumor))
@@ -380,7 +381,7 @@ sum(is.na(oredered_genes.Stage_II))
 
 # give names (cause thats just what you gotta do)
 names(oredered_genes.Tumor) <- rownames(res_NT_vs_TP.LFC)
-names(oredered_genes.Stage_II) <- rownames(res_I_vs_II.LFC.Clean)
+names(oredered_genes.Stage_II) <- rownames(res_I_vs_II.LFC)
 
 # order
 oredered_genes.Tumor <- sort(oredered_genes.Tumor, decreasing = TRUE)
@@ -489,23 +490,44 @@ xCell2 and its immune reference.
 
 ```{r}
 # first we get the normalized  counts from the differential expression
-normalized_counts_matrix.LIHC <- counts(LIHC.dds, normalized = TRUE)
-sum(is.na(rownames(normalized_counts_matrix.LIHC)))
+normalized_counts_matrix.LIHC_shortLetterCode <- counts(LIHC_shortLetterCode.dds, normalized = TRUE)
+normalized_counts_matrix.LIHC_Stage <- counts(LIHC_Stage.dds, normalized = TRUE)
+
+sum(is.na(rownames(normalized_counts_matrix.LIHC_shortLetterCode)))
+sum(is.na(rownames(normalized_counts_matrix.LIHC_Stage)))
+
 # remove version number
-rownames(normalized_counts_matrix.LIHC) <- gsub("\\..*", "", rownames(normalized_counts_matrix.LIHC))
-# make symbol
+rownames(normalized_counts_matrix.LIHC_shortLetterCode) <- gsub("\\..*", "", rownames(normalized_counts_matrix.LIHC_shortLetterCode))
+
+rownames(normalized_counts_matrix.LIHC_Stage) <- gsub("\\..*", "", rownames(normalized_counts_matrix.LIHC_Stage))
+
+# make symbol (important to do twice because they dont have excatly the same data)
 gene_symbols <- mapIds(org.Hs.eg.db,
-                        keys = rownames(normalized_counts_matrix.LIHC),
+                        keys = rownames(normalized_counts_matrix.LIHC_shortLetterCode),
                         column = "SYMBOL",
                         keytype = "ENSEMBL",
                         multiVals = "first")
 
-rownames(normalized_counts_matrix.LIHC) <- gene_symbols[rownames(normalized_counts_matrix.LIHC)]
+rownames(normalized_counts_matrix.LIHC_shortLetterCode) <- gene_symbols[rownames(normalized_counts_matrix.LIHC_shortLetterCode)]
+
+gene_symbols <- mapIds(org.Hs.eg.db,
+                        keys = rownames(normalized_counts_matrix.LIHC_Stage),
+                        column = "SYMBOL",
+                        keytype = "ENSEMBL",
+                        multiVals = "first")
+
+rownames(normalized_counts_matrix.LIHC_Stage) <- gene_symbols[rownames(normalized_counts_matrix.LIHC_Stage)]
+
 # no error! that's a relief. lets check for NA
-sum(is.na(rownames(normalized_counts_matrix.LIHC)))
+sum(is.na(rownames(normalized_counts_matrix.LIHC_shortLetterCode)))
+sum(is.na(rownames(normalized_counts_matrix.LIHC_Stage)))
+
 # thats a lot of na, so lets get them out
-clean_normalized_counts_matrix.LIHC <- normalized_counts_matrix.LIHC[!is.na(rownames(normalized_counts_matrix.LIHC)),]
-sum(is.na(rownames(clean_normalized_counts_matrix.LIHC)))
+clean_normalized_counts_matrix.LIHC_shortLetterCode <- normalized_counts_matrix.LIHC_shortLetterCode[!is.na(rownames(normalized_counts_matrix.LIHC_shortLetterCode)),]
+sum(is.na(rownames(clean_normalized_counts_matrix.LIHC_shortLetterCode)))
+
+clean_normalized_counts_matrix.LIHC_Stage <- normalized_counts_matrix.LIHC_Stage[!is.na(rownames(normalized_counts_matrix.LIHC_Stage)),]
+sum(is.na(rownames(clean_normalized_counts_matrix.LIHC_Stage)))
 ```
 
 
@@ -517,7 +539,10 @@ sum(is.na(rownames(clean_normalized_counts_matrix.LIHC)))
 data(ImmuneCompendium.xCell2Ref, package = "xCell2")
 
 # run analysis
-xCell_immune_res.LIHC <- xCell2Analysis(mix = clean_normalized_counts_matrix.LIHC,
+xCell_immune_res.LIHC_shortLetterCode <- xCell2Analysis(mix = clean_normalized_counts_matrix.LIHC_shortLetterCode,
+                               xcell2object = ImmuneCompendium.xCell2Ref)
+
+xCell_immune_res.LIHC_Stage <- xCell2Analysis(mix = clean_normalized_counts_matrix.LIHC_Stage,
                                xcell2object = ImmuneCompendium.xCell2Ref)
 ```
 
