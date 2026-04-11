@@ -119,90 +119,225 @@ notNormal_or_Tumor <- rownames(Bio.LIHC.metadata_df)[Bio.LIHC.metadata_df$shortL
 Bio.LIHC.metadata_df[notNormal_or_Tumor, "shortLetterCode"]
 
 # that is a recurrent tumor, which we don't want to deal with so i will remove them
-Bio.LIHC.clean_metadata_df <- Bio.LIHC.metadata_df[Bio.LIHC.metadata_df$shortLetterCode != "TR",]
+Bio.LIHC_shortLetterCode.clean_metadata_df <- Bio.LIHC.metadata_df[Bio.LIHC.metadata_df$shortLetterCode != "TR",]
 
 # how many NA are in the cancer stage?
-cancerStageCountNA <- sum(is.na(Bio.LIHC.clean_metadata_df$ajcc_pathologic_stage))
+sum(is.na(Bio.LIHC.clean_metadata_df$ajcc_pathologic_stage))
 
+# remove NA for stage analysis
+Bio.LIHC_Stage.clean_metadata_df <- Bio.LIHC.clean_metadata_df[!is.na(Bio.LIHC.clean_metadata_df$ajcc_pathologic_stage),]
+
+# simplify stages
+Bio.LIHC_Stage.clean_metadata_df$simplified_stage <- gsub("[ABC]$", "", Bio.LIHC_Stage.clean_metadata_df$ajcc_pathologic_stage)  
+
+# how many are there from every stage?
+sum(Bio.LIHC_Stage.clean_metadata_df$simplified_stage == "Stage 0")
+
+sum(Bio.LIHC_Stage.clean_metadata_df$simplified_stage == "Stage I")
+
+sum(Bio.LIHC_Stage.clean_metadata_df$simplified_stage == "Stage II")
+
+sum(Bio.LIHC_Stage.clean_metadata_df$simplified_stage == "Stage III")
+
+sum(Bio.LIHC_Stage.clean_metadata_df$simplified_stage == "Stage IV")
+
+# there is only one 0 stage sample. so we will remove it and use only the others
+Bio.LIHC_Stage.clean_metadata_df <- Bio.LIHC_Stage.clean_metadata_df[Bio.LIHC_Stage.clean_metadata_df$simplified_stage != "Stage 0",]
 ```
 
 ```{r}
 # get the Seq counts data
 
 counts.LIHC <- assay(Bio.LIHC.data)
-clean_counts.LIHC <- counts.LIHC[,rownames(Bio.LIHC.clean_metadata_df)]
+clean_counts.LIHC_shortLetterCode <- counts.LIHC[,rownames(Bio.LIHC.clean_metadata_df)]
+
+clean_counts.LIHC_Stage <- counts.LIHC[,rownames(Bio.LIHC_Stage.clean_metadata_df)]
 
 # check if everything is ready for DESeq
-all(rownames(Bio.LIHC.clean_metadata_df) == colnames(clean_counts.LIHC))
+all(rownames(Bio.LIHC_shortLetterCode.clean_metadata_df) == colnames(clean_counts.LIHC_shortLetterCode))
+
+all(rownames(Bio.LIHC_Stage.clean_metadata_df) == colnames(clean_counts.LIHC_Stage))
+
 sum(is.na(Bio.LIHC.clean_metadata_df$shortLetterCode))
+sum(is.na(Bio.LIHC_Stage.clean_metadata_df$simplified_stage))
 
 ```
 
 ### Decision checkpoint #2:
 
 We decided to use DESeq2 as our differential expression tool because it
-is the one we were most familiar with, a standard and reliable tool. One
-alternative for this size of dataset was edgeR, but
+is the one we were most familiar with, a standard and reliable tool.
 
 ```{r}
-# create DESeq object and perform DEseq
-LIHC.dds <- DESeqDataSetFromMatrix(
-                              countData = clean_counts.LIHC,
-                              colData = Bio.LIHC.clean_metadata_df,
+# create DESeq object for the short letter code
+LIHC_shortLetterCode.dds <- DESeqDataSetFromMatrix(
+                              countData = clean_counts.LIHC_shortLetterCode,
+                              colData = Bio.LIHC_shortLetterCode.clean_metadata_df,
                               design = ~ shortLetterCode
 )
-LIHC.dds <- LIHC.dds[(rowSums(counts(LIHC.dds)) >= 10), ]
+LIHC_shortLetterCode.dds <- LIHC_shortLetterCode.dds[(rowSums(counts(LIHC_shortLetterCode.dds)) >= 10), ]
+
+# create DESeq object for the stages
+LIHC_Stage.dds <- DESeqDataSetFromMatrix(
+                              countData = clean_counts.LIHC_Stage,
+                              colData = Bio.LIHC_Stage.clean_metadata_df,
+                              design = ~ simplified_stage
+)
+LIHC_Stage.dds <- LIHC_Stage.dds[(rowSums(counts(LIHC_Stage.dds)) >= 10), ]
 ```
 
 # define reference level
 
 ```{r}
-LIHC.dds$shortLetterCode <- relevel(LIHC.dds$shortLetterCode, ref = "NT")
+# reference level is I, not 0
+LIHC_Stage.dds$simplified_stage <- relevel(LIHC_Stage.dds$simplified_stage, ref = "Stage I")
+
+LIHC_shortLetterCode.dds$shortLetterCode <- relevel(LIHC_shortLetterCode.dds$shortLetterCode, ref = "NT")
 ```
 
 # run DESeq
 
 ```{r}
-LIHC.dds <- DESeq(LIHC.dds)
-resultsNames(LIHC.dds)
+LIHC_shortLetterCode.dds <- DESeq(LIHC_shortLetterCode.dds)
+resultsNames(LIHC_shortLetterCode.dds)
+
+LIHC_Stage.dds <- DESeq(LIHC_Stage.dds)
+resultsNames(LIHC_Stage.dds)
 ```
 
 # get resaults
 
 ```{r}
-res_TP_vs_NT.LFC <- lfcShrink(LIHC.dds, coef = "shortLetterCode_TP_vs_NT", type = "apeglm")
+res_NT_vs_TP.LFC <- lfcShrink(LIHC_shortLetterCode.dds, coef = "shortLetterCode_TP_vs_NT", type = "apeglm")
+
+res_I_vs_II.LFC <- lfcShrink(LIHC_Stage.dds, coef = "simplified_stage_Stage.II_vs_Stage.I", type = "apeglm")
+
+res_I_vs_III.LFC <- lfcShrink(LIHC_Stage.dds, coef = "simplified_stage_Stage.III_vs_Stage.I", type = "apeglm")
+
+res_I_vs_IV.LFC <- lfcShrink(LIHC_Stage.dds, coef = "simplified_stage_Stage.IV_vs_Stage.I", type = "apeglm")
+
 
 # clear the genes of their version number (important so GSEA will know what to do and so we can add the gene symbol)
+rownames(res_NT_vs_TP.LFC) <- gsub("\\..*", "", 
+rownames(res_NT_vs_TP.LFC))
 
-rownames(res_TP_vs_NT.LFC) <- gsub("\\..*", "", rownames(res_TP_vs_NT.LFC))
+rownames(res_I_vs_II.LFC) <- gsub("\\..*", "", 
+rownames(res_I_vs_II.LFC))
+
+rownames(res_I_vs_III.LFC) <- gsub("\\..*", "", rownames(res_I_vs_III.LFC))
+
+rownames(res_I_vs_IV.LFC) <- gsub("\\..*", "", rownames(res_I_vs_IV.LFC))
+
+
 
 # add symbols so we can "easily" interpret the genes
 # Add gene symbols
-res_TP_vs_NT.LFC$symbol <- mapIds(org.Hs.eg.db,
-                        keys = rownames(res_TP_vs_NT.LFC),
+res_NT_vs_TP.LFC$symbol <- mapIds(org.Hs.eg.db,
+                        keys = rownames(res_NT_vs_TP.LFC),
                         column = "SYMBOL",
                         keytype = "ENSEMBL",
                         multiVals = "first")
+
+res_I_vs_II.LFC$symbol <- mapIds(org.Hs.eg.db,
+                        keys = rownames(res_I_vs_II.LFC),
+                        column = "SYMBOL",
+                        keytype = "ENSEMBL",
+                        multiVals = "first")
+
+res_I_vs_III.LFC$symbol <- mapIds(org.Hs.eg.db,
+                        keys = rownames(res_I_vs_III.LFC),
+                        column = "SYMBOL",
+                        keytype = "ENSEMBL",
+                        multiVals = "first")
+res_I_vs_IV.LFC$symbol <- mapIds(org.Hs.eg.db,
+                        keys = rownames(res_I_vs_IV.LFC),
+                        column = "SYMBOL",
+                        keytype = "ENSEMBL",
+                        multiVals = "first")
+
 ```
+
+# perform pca to visualize a bit whats going on
+
+```{r}
+any(duplicated(rownames(res_NT_vs_TP.LFC)))
+any(duplicated(rownames(res_I_vs_II.LFC)))
+any(duplicated(rownames(res_I_vs_III.LFC)))
+any(duplicated(rownames(res_I_vs_IV.LFC)))
+
+counts.vst.LIHC_shortLetterCode <- DESeq2::vst(LIHC_shortLetterCode.dds, blind = TRUE)
+
+pcaData.LIHC_shortLetterCode <- DESeq2::plotPCA(counts.vst.LIHC_shortLetterCode, ntop = 1000, intgroup = c("shortLetterCode"), returnData = TRUE)
+
+counts.vst.LIHC_Stage <- DESeq2::vst(LIHC_Stage.dds, blind = TRUE)
+
+pcaData.LIHC_Stage <- DESeq2::plotPCA(counts.vst.LIHC_Stage, ntop = 1000, intgroup = c("simplified_stage"), returnData = TRUE)
+```
+### prediction #1:
+It is safe to say that we will see a lot of variance between the tumor and non tumor samples, seeing as the biological difference between them is sky and land.
+The variance between the stages should be seen, but probably not as much compared to the tumor and non tumor samples.
+# visualize
+
+```{r}
+percentVar <- round(100 * attr(pcaData.LIHC_shortLetterCode, "percentVar"))
+plot_shortLetterCode <- ggplot(pcaData.LIHC_shortLetterCode, aes(x=PC1, y=PC2, color=shortLetterCode)) + geom_point(size = 3) + labs(
+       subtitle = "Each point is a patient's gene expression profile",
+       x = paste0("PC1 (", percentVar[1], "% Variance)"),
+       y = paste0("PC2 (", percentVar[2], "% Variance)"))
+
+percentVar <- round(100 * attr (pcaData.LIHC_Stage, "percentVar"))
+plot_Stage <- ggplot(pcaData.LIHC_Stage, aes(x=PC1, y=PC2, color=simplified_stage)) + geom_point(size = 3) + labs(
+       subtitle = "Each point is a patient's gene expression profile",
+       x = paste0("PC1 (", percentVar[1], "% Variance)"),
+       y = paste0("PC2 (", percentVar[2], "% Variance)"))
+
+combined_plot <- ggplot(pcaData.LIHC_Stage, aes(x=PC1, y=PC2, color=simplified_stage, shape=shortLetterCode)) + geom_point(size = 3) + labs(
+       subtitle = "Each point is a patient's gene expression profile",
+       x = paste0("PC1 (", percentVar[1], "% Variance)"),
+       y = paste0("PC2 (", percentVar[2], "% Variance)"))
+combined_plot
+plot_shortLetterCode
+plot_Stage
+# looks awesome!
+```
+These plots look the same (except for the flip) for an important reason. and that is that PCA does not care for our design, and just looks at the two biggest directions of varience.
+We can see a cluster of non tumor samples up to the bottom right. But weirdly enough, all the different stages are mixed together. This could suggest that the principal componants of the variance between nonTumor and Tumor samples is not at all related to the differences between the stages.
 
 # look at the volcano plot
 
 ```{r fig.width=8, fig.height=8}
 
-EnhancedVolcano::EnhancedVolcano(res_TP_vs_NT.LFC,
-                lab = res_TP_vs_NT.LFC$symbol,
+EnhancedVolcano::EnhancedVolcano(res_I_vs_II.LFC,
+                lab = res_I_vs_II.LFC$symbol,
                 x = 'log2FoldChange',
                 y = 'padj',
                 labSize = 3,
                 FCcutoff = 5, 
-                pCutoff = 0.00001,
-                title = 'Tumor vs non tumor sample')
+                pCutoff = 0.05,
+                title = 'Stage I vs Stage II cancer')
+EnhancedVolcano::EnhancedVolcano(res_I_vs_IV.LFC,
+                lab = res_I_vs_IV.LFC$symbol,
+                x = 'log2FoldChange',
+                y = 'padj',
+                labSize = 3,
+                FCcutoff = 5, 
+                pCutoff = 0.05,
+                title = 'Stage I vs Stage IV cancer')
 
-sort(res_TP_vs_NT.LFC$log2FoldChange, decreasing = TRUE)
+EnhancedVolcano::EnhancedVolcano(res_NT_vs_TP.LFC,
+                lab = res_NT_vs_TP.LFC$symbol,
+                x = 'log2FoldChange',
+                y = 'padj',
+                labSize = 3,
+                FCcutoff = 5, 
+                pCutoff = 0.05,
+                title = 'Non Tumor vs Tumor samples')
+
+
 ```
 
-lets look at some genes with high log_2 fold change and p value: TERT -
-an important gene that helps in the production of telomerase which when
+lets look at some genes with high log_2 fold change and p value from the NT to TP volcano plot:
+TERT - an important gene that helps in the production of telomerase which when
 activated, allows cell reproduction to continue (this is a highly
 expressed gene in most cancer, so a good sign)
 
@@ -216,25 +351,7 @@ genes. and it ruins somehow the DNA repair, which also helps tumor grow
 (one could say that the cancer is here because of the high expression,
 but im not going to take that jump)
 
-# perform pca to visualize
 
-```{r}
-counts.vst.LIHC <- DESeq2::vst(LIHC.dds, blind = TRUE)
-
-pcaData.LIHC <- DESeq2::plotPCA(counts.vst.LIHC, ntop = 1000, intgroup = c("shortLetterCode"), returnData = TRUE)
-```
-
-# visualize
-
-```{r}
-percentVar <- round(100 * attr(pcaData.LIHC, "percentVar"))
-plot <- ggplot(pcaData.LIHC, aes(x=PC1, y=PC2, color=shortLetterCode)) + geom_point(size = 3) + labs(
-       subtitle = "Each point is a patient's gene expression profile",
-       x = paste0("PC1 (", percentVar[1], "% Variance)"),
-       y = paste0("PC2 (", percentVar[2], "% Variance)"))
-plot
-# looks awesome!
-```
 
 ### Desicion checkpoint #3:
 
@@ -251,20 +368,36 @@ analysis.
 ```{r}
 # sort the genes by differentiallity
 
+# clean the res
+res_I_vs_II.LFC.Clean <- res_I_vs_II.LFC[res_I_vs_II.LFC$log2FoldChange != 0,]
 # get differentiallity
-oredered_genes.tumor_sample <- res_TP_vs_NT.LFC$log2FoldChange
+oredered_genes.Tumor <- res_NT_vs_TP.LFC$log2FoldChange
+oredered_genes.Stage_II <- res_I_vs_II.LFC.Clean$log2FoldChange
 
 # check for NA
-sum(is.na(oredered_genes.tumor_sample))
+sum(is.na(oredered_genes.Tumor))
+sum(is.na(oredered_genes.Stage_II))
 
 # give names (cause thats just what you gotta do)
-names(oredered_genes.tumor_sample) <- rownames(res_TP_vs_NT.LFC)
+names(oredered_genes.Tumor) <- rownames(res_NT_vs_TP.LFC)
+names(oredered_genes.Stage_II) <- rownames(res_I_vs_II.LFC.Clean)
 
 # order
-oredered_genes.tumor_sample <- sort(oredered_genes.tumor_sample, decreasing = TRUE)
+oredered_genes.Tumor <- sort(oredered_genes.Tumor, decreasing = TRUE)
+oredered_genes.Stage_II <- sort(oredered_genes.Stage_II, decreasing = TRUE)
 
+```
+```{r}
+# we got some weird artifacts. so we will try a different metric to order the genes with
 
+#res_I_vs_II.LFC$gsea_metric <- sign(res_I_vs_II.LFC$log2FoldChange) * -log10(res_I_vs_II.LFC$pvalue)
 
+#res_clean_I_vs_II <- res_I_vs_II.LFC[!is.na(res_I_vs_II.LFC$gsea_metric),]
+
+# order by this new metric
+#oredered_genes.Stage_II <- res_clean_I_vs_II$gsea_metric
+#names(oredered_genes.Stage_II) <- rownames(res_clean_I_vs_II)
+#oredered_genes.Stage_II <- sort(oredered_genes.Stage_II, decreasing = TRUE)
 ```
 
 ### Decision checkpoint #4:
@@ -275,18 +408,28 @@ significance
 ```{r}
 # perform GSEA (using hallmark sets for a human)
 hallmark <- msigdbr(species = "Homo sapiens") %>% dplyr::select(gs_name, ensembl_gene)
-gseaHallmark_res.tumor_sample <- GSEA(geneList = oredered_genes.tumor_sample,
+
+gseaHallmark_res.Tumor <- GSEA(geneList = oredered_genes.Tumor,
                                       pvalueCutoff = 0.05,
                                       nPermSimple = 10000,
                                       TERM2GENE = hallmark,
                                       verbose = FALSE, 
                                       eps = 0)
 ```
+```{r}
+gseaHallmark_res.Stage_II <- GSEA(geneList = oredered_genes.Stage_II,
+                                      pvalueCutoff = 0.05,
+                                      nPermSimple = 10000,
+                                      TERM2GENE = hallmark,
+                                      verbose = FALSE, 
+                                      eps = 0)
+
+```
 
 ```{r}
 # visualize
 
-dotplot(gseaHallmark_res.tumor_sample, showCategory = 10, split = ".sign", 
+dotplot(gseaHallmark_res.Stage_II, showCategory = 10, split = ".sign", 
         title = "tumor sample enriched patways") +
    theme_minimal(base_size = 6) + facet_grid(. ~ .sign)
 ```
@@ -295,48 +438,31 @@ so there are really enriched and supressed genes (mostly supressed it
 seems). but we want to specifically look at the effect on immune
 pathways
 
-```{r}
-#hallmark_immune <- msigdbr(species = "Homo sapiens", category = "C7", subcategory = "IMMUNESIGDB") %>% dplyr::select(gs_name, ensembl_gene)
-#gseaHallmark_immune_res.tumor_sample <- GSEA(geneList = oredered_genes.tumor_sample,
-#                                      pvalueCutoff = 0.05,
-#                                      nPermSimple = 10000,
-#                                      TERM2GENE = hallmark_immune,
-#                                      verbose = FALSE, 
-#                                      eps = 0)
-```
 
-visualize
-
-```{r}
-
-#dotplot(gseaHallmark_immune_res.tumor_sample, showCategory = 10, split=".sign", 
-#        title = "tumor sample enriched patways") +
-#   theme_minimal(base_size = 6) + facet_grid(. ~ .sign)
-```
 
 ### Prediction #1:
 A prediction of the enrichment score of these 4 immune pathways can go both ways.
 We would assume that there will be variance, meaning the immune pathways are either supressed or activated.
 As learned during the tutorials, this will point towards the tumor being "hot" or "cold" meaning an active immune environment and a supressed immune environment respectively.
 ```{r}
-enrichplot_Inflammatory_response <- enrichplot::gseaplot2(gseaHallmark_res.tumor_sample, 
+enrichplot_Inflammatory_response <- enrichplot::gseaplot2(gseaHallmark_res.Stage_II, 
                       geneSetID = "HALLMARK_INFLAMMATORY_RESPONSE", 
                       title = "Inflammatory response")
 
-enrichplot_Interferon_alpha_response <- enrichplot::gseaplot2(gseaHallmark_res.tumor_sample, 
+enrichplot_Interferon_alpha_response <- enrichplot::gseaplot2(gseaHallmark_res.Stage_II, 
                       geneSetID = "HALLMARK_INTERFERON_ALPHA_RESPONSE",
                       title = "Interfron alpha response")
 
-enrichplot_Interferon_gamma_response <- enrichplot::gseaplot2(gseaHallmark_res.tumor_sample, 
+enrichplot_Interferon_gamma_response <- enrichplot::gseaplot2(gseaHallmark_res.Stage_II, 
                       geneSetID = "HALLMARK_INTERFERON_GAMMA_RESPONSE",
                       title = "Interfron gamma response")
 
-enrichplot_TNFA_signaling <- enrichplot::gseaplot2(gseaHallmark_res.tumor_sample, 
+enrichplot_TNFA_signaling <- enrichplot::gseaplot2(gseaHallmark_res.Stage_II, 
                       geneSetID = "HALLMARK_TNFA_SIGNALING_VIA_NFKB",
                       title = "TNFA signaling")
 
 
-enrichplot_combined = enrichplot::gseaplot2(gseaHallmark_res.tumor_sample, 
+enrichplot_combined = enrichplot::gseaplot2(gseaHallmark_res.Stage_II, 
                       geneSetID = c("HALLMARK_INFLAMMATORY_RESPONSE",
                                     "HALLMARK_INTERFERON_ALPHA_RESPONSE",
                                     "HALLMARK_INTERFERON_GAMMA_RESPONSE",
@@ -347,6 +473,7 @@ enrichplot_Inflammatory_response
 enrichplot_Interferon_alpha_response
 enrichplot_Interferon_gamma_response
 enrichplot_TNFA_signaling
+#enrichplot_combined
 ```
 
 all four pathways are an integral part of the immune system. When
