@@ -42,14 +42,6 @@ library(tidyverse)
 library(xCell2)
 ```
 
-------------------------------------------------------------------------
-
-## 1. Abstract (300 words in english)
-
-------------------------------------------------------------------------
-
-## 2. Main analysis: Bulk RNA-seq
-
 ### 2.1 Prediction #1:
 
 **Prediction**:
@@ -64,17 +56,24 @@ library(xCell2)
 
 **Alternative considered**:
 
-**Why we rejected the alternative**:
+## **Why we rejected the alternative**:
 
-## 2.4 Code:
+## 1. Abstract (300 words in english)
 
-### Decision checkpoint #1:
+------------------------------------------------------------------------
 
-This is actually the first decision checkpoint. The choice of TCGA-LIHC
-as the dataset is crucial, seeing as it is very general and
-comprehensive with many samples (though only with 50 normal samples). An
-alternative we had was GSE-144269. But seeing as it was smaller and only
-had patients with prior HepD that interfered with the results.
+## 2. Main analysis: Bulk RNA-seq
+
+### Data Acqusition and Preprocessing
+
+-   **Decision checkpoint #1: Dataset Selection**
+-   **The decision:**: TCGA-LIHC as the dataset.
+-   **Why we chose it**: It is crucial, seeing as it is very general and
+    comprehensive with many samples (though only with 50 normal
+    samples.)
+-   **Alternative considered**: GSE-144269
+-   **Why we rejected the alternative**: Seeing as it was smaller and
+    only had patients with prior HepD that interfered with the results.
 
 ```{r}
 # get the data
@@ -165,10 +164,16 @@ sum(is.na(Bio.LIHC_Stage.clean_metadata_df$simplified_stage))
 
 ```
 
-### Decision checkpoint #2:
+### Differential Expression Analysis
 
-We decided to use DESeq2 as our differential expression tool because it
-is the one we were most familiar with, a standard and reliable tool.
+-   **Decision checkpoint #2: Differential Expression Tool**
+-   **The decision**: We decided to use DESeq2 as our differential
+    expression tool.
+-   **Why we chose it**: It is the one we were most familiar with, a
+    standard and reliable tool.
+-   **Alternative considered**: edgeR.
+-   **Why we rejected the alternative**: Preferred DESeq2 for
+    familiarity.
 
 ```{r}
 # create DESeq object for the short letter code
@@ -188,7 +193,7 @@ LIHC_Stage.dds <- DESeqDataSetFromMatrix(
 LIHC_Stage.dds <- LIHC_Stage.dds[(rowSums(counts(LIHC_Stage.dds)) >= 10), ]
 ```
 
-# define reference level
+**define reference level**
 
 ```{r}
 # reference level is I, not 0
@@ -197,7 +202,7 @@ LIHC_Stage.dds$simplified_stage <- relevel(LIHC_Stage.dds$simplified_stage, ref 
 LIHC_shortLetterCode.dds$shortLetterCode <- relevel(LIHC_shortLetterCode.dds$shortLetterCode, ref = "NT")
 ```
 
-# run DESeq
+**run DESeq**
 
 ```{r}
 LIHC_shortLetterCode.dds <- DESeq(LIHC_shortLetterCode.dds)
@@ -207,7 +212,7 @@ LIHC_Stage.dds <- DESeq(LIHC_Stage.dds)
 resultsNames(LIHC_Stage.dds)
 ```
 
-# get resaults
+**get results**
 
 ```{r}
 res_NT_vs_TP.LFC <- lfcShrink(LIHC_shortLetterCode.dds, coef = "shortLetterCode_TP_vs_NT", type = "apeglm")
@@ -259,26 +264,30 @@ res_I_vs_IV.LFC$symbol <- mapIds(org.Hs.eg.db,
 
 ```
 
-# perform pca to visualize a bit whats going on
+**perform pca to visualize a bit whats going on**
 
 ```{r}
-any(duplicated(rownames(res_NT_vs_TP.LFC)))
-any(duplicated(rownames(res_I_vs_II.LFC)))
-any(duplicated(rownames(res_I_vs_III.LFC)))
-any(duplicated(rownames(res_I_vs_IV.LFC)))
-
+# get vst (variance stabilizing transformation)
 counts.vst.LIHC_shortLetterCode <- DESeq2::vst(LIHC_shortLetterCode.dds, blind = TRUE)
 
+# apply PCA
 pcaData.LIHC_shortLetterCode <- DESeq2::plotPCA(counts.vst.LIHC_shortLetterCode, ntop = 1000, intgroup = c("shortLetterCode"), returnData = TRUE)
 
 counts.vst.LIHC_Stage <- DESeq2::vst(LIHC_Stage.dds, blind = TRUE)
 
 pcaData.LIHC_Stage <- DESeq2::plotPCA(counts.vst.LIHC_Stage, ntop = 1000, intgroup = c("simplified_stage"), returnData = TRUE)
 ```
-### prediction #1:
-It is safe to say that we will see a lot of variance between the tumor and non tumor samples, seeing as the biological difference between them is sky and land.
-The variance between the stages should be seen, but probably not as much compared to the tumor and non tumor samples.
-# visualize
+
+**Prediction #1: PCA dotplot clusters**
+
+-   **Prediction**: All the non tumor samples will cluster and all the
+    tumor samples will cluster. The stages of the cancer will also
+    cluster together, but more loosely.
+-   **Biological Reasoning**: The difference between a tumor sample and
+    non tumor sample is *huge*, a cancer is like another organism
+    growing inside you. The differences between stages of the cancer
+    should exist but be mild compared to the differences between tumor
+    and non tumor tissue.
 
 ```{r}
 percentVar <- round(100 * attr(pcaData.LIHC_shortLetterCode, "percentVar"))
@@ -297,15 +306,35 @@ combined_plot <- ggplot(pcaData.LIHC_Stage, aes(x=PC1, y=PC2, color=simplified_s
        subtitle = "Each point is a patient's gene expression profile",
        x = paste0("PC1 (", percentVar[1], "% Variance)"),
        y = paste0("PC2 (", percentVar[2], "% Variance)"))
-combined_plot
 plot_shortLetterCode
 plot_Stage
 # looks awesome!
 ```
-These plots look the same (except for the flip) for an important reason. and that is that PCA does not care for our design, and just looks at the two biggest directions of varience.
-We can see a cluster of non tumor samples up to the bottom right. But weirdly enough, all the different stages are mixed together. This could suggest that the principal componants of the variance between nonTumor and Tumor samples is not at all related to the differences between the stages.
 
-# look at the volcano plot
+-   **Result comparison (prediction #1)**:That is interesting! As predicted, non
+    tumor samples all clustered together, but contrary to what we
+    thought, the tumor samples were all over the place (even when
+    looking through the stages). After some searching, it seems that the
+    reason is quite simple. Cancer is a very varied disease, the
+    differnces between the same cancer in two different people can be
+    very big! And so it makes sense that the tumor samples will "spread
+    out". The fact that the Stage wasn't a big principal componant is a
+    bit weird, but also makes sense when thinking of the fact that
+    different people with different stages of cancer can vary a lot, and
+    are very dependant on the patient.
+
+**look at the volcano plot**
+
+**note about the plots**: The p-value cutoff for all plots are 0.05 as a
+standard p-value for statistical significance. But the FC cutoff is
+different. Because we expect massive differences between tumor and non
+tumor samples, the fold change is naturally big for many of the genes,
+so the FC cutoff for the Tumor_vs_Non_Tumor plot is 5. While for the
+stage differnces, it is 2.5 .
+
+Also note that the volcano plot of Stage
+I to Stage IV looks weird, this is probably due to the fact that only 3
+stage IV samples are present, which may cause some anomalies.
 
 ```{r fig.width=8, fig.height=8}
 
@@ -314,15 +343,23 @@ EnhancedVolcano::EnhancedVolcano(res_I_vs_II.LFC,
                 x = 'log2FoldChange',
                 y = 'padj',
                 labSize = 3,
-                FCcutoff = 5, 
+                FCcutoff = 2.5, 
                 pCutoff = 0.05,
                 title = 'Stage I vs Stage II cancer')
+EnhancedVolcano::EnhancedVolcano(res_I_vs_III.LFC,
+                lab = res_I_vs_III.LFC$symbol,
+                x = 'log2FoldChange',
+                y = 'padj',
+                labSize = 3,
+                FCcutoff = 2.5, 
+                pCutoff = 0.05,
+                title = 'Stage I vs Stage III cancer')
 EnhancedVolcano::EnhancedVolcano(res_I_vs_IV.LFC,
                 lab = res_I_vs_IV.LFC$symbol,
                 x = 'log2FoldChange',
                 y = 'padj',
                 labSize = 3,
-                FCcutoff = 5, 
+                FCcutoff = 2.5, 
                 pCutoff = 0.05,
                 title = 'Stage I vs Stage IV cancer')
 
@@ -338,38 +375,42 @@ EnhancedVolcano::EnhancedVolcano(res_NT_vs_TP.LFC,
 
 ```
 
-lets look at some genes with high log_2 fold change and p value from the NT to TP volcano plot:
-TERT - an important gene that helps in the production of telomerase which when
-activated, allows cell reproduction to continue (this is a highly
-expressed gene in most cancer, so a good sign)
+lets look at some genes with high log_2 fold change and p value from the
+NT to TP volcano plot:
 
-CPLX2 - this is actually a cognitive related gene, that low expression
-of points to neorological decline (high expressivity seems not
-connected, but doesnt necciseraly mean anything)
+TERT - an important gene that helps in the
+production of telomerase which when activated, allows cell reproduction
+to continue (this is a highly expressed gene in most cancer, so a good
+sign) 
 
-LINC01419 - from what i read this gene literally just ruins everything
-and helps the cancer. in the nucleus it supresses tumor supressing
-genes. and it ruins somehow the DNA repair, which also helps tumor grow
-(one could say that the cancer is here because of the high expression,
-but im not going to take that jump)
+CPLX2 - this is actually a cognitive related gene, that low
+expression of points to neorological decline (high expressivity seems
+not connected, but doesnt necciseraly mean anything) 
 
+LINC01419 - from
+what i read this gene literally just ruins everything and helps the
+cancer. in the nucleus it supresses tumor supressing genes. and it ruins
+somehow the DNA repair, which also helps tumor grow (one could say that
+the cancer is here because of the high expression, but im not going to
+take that jump)
 
+### Pathway Enrichment Analysis
 
-### Desicion checkpoint #3:
+**Desicion checkpoint #3: Pathway Analysis Tool**
 
-Seeing as we want to check the immune pathways (as in, know a lot about
-a little), GSEA is an excellent tool for the job. By choosing specific
-pathways (as seen later), we can see excatly how and how much is that
-pathway differentially expressed. An alternative was ORA, but it is much
-less sophisticated and robust, and it is much more suited for quick
-small answers, while we need this as a robust and main part of our
-analysis.
-
-### GSEA
+-   **The decision**: GSEA is an excellent tool for the job.
+-   **Why we chose it**: Seeing as we want to check the immune pathways
+    (as in, know a lot about a little), GSEA was built for this exact
+    purpous, and is robust and versetile.
+-   **Alternative considered**: ORA.
+-   **Why we rejected the alternative**: Not only it is less
+    sophisticated, and is more well suited for quick small answers, the
+    experience and familiarity with GSEA is non replacable.
 
 ```{r}
 # sort the genes by differentiallity
 
+# note that res_I_vs_IV is ommited here, due to the lack of statistical power from only 3 samples
 
 # get differentiallity
 oredered_genes.Tumor <- res_NT_vs_TP.LFC$log2FoldChange
@@ -392,27 +433,17 @@ oredered_genes.Stage_II <- sort(oredered_genes.Stage_II, decreasing = TRUE)
 oredered_genes.Stage_III <- sort(oredered_genes.Stage_III, decreasing = TRUE)
 
 ```
-```{r}
-# we got some weird artifacts. so we will try a different metric to order the genes with
-
-#res_I_vs_II.LFC$gsea_metric <- sign(res_I_vs_II.LFC$log2FoldChange) * -log10(res_I_vs_II.LFC$pvalue)
-
-#res_clean_I_vs_II <- res_I_vs_II.LFC[!is.na(res_I_vs_II.LFC$gsea_metric),]
-
-# order by this new metric
-#oredered_genes.Stage_II <- res_clean_I_vs_II$gsea_metric
-#names(oredered_genes.Stage_II) <- rownames(res_clean_I_vs_II)
-#oredered_genes.Stage_II <- sort(oredered_genes.Stage_II, decreasing = TRUE)
-```
-
-### Decision checkpoint #4:
 
 A p-value of 0.05 was chosen as a standard p-value for statistical
 significance
 
 ```{r}
-# perform GSEA (using hallmark sets for a human)
 hallmark <- msigdbr(species = "Homo sapiens") %>% dplyr::select(gs_name, ensembl_gene)
+```
+
+```{r}
+# perform GSEA (using hallmark sets for a human)
+
 
 gseaHallmark_res.Tumor <- GSEA(geneList = oredered_genes.Tumor,
                                       pvalueCutoff = 0.05,
@@ -421,6 +452,7 @@ gseaHallmark_res.Tumor <- GSEA(geneList = oredered_genes.Tumor,
                                       verbose = FALSE, 
                                       eps = 0)
 ```
+
 ```{r}
 gseaHallmark_res.Stage_II <- GSEA(geneList = oredered_genes.Stage_II,
                                       pvalueCutoff = 0.05,
@@ -430,6 +462,7 @@ gseaHallmark_res.Stage_II <- GSEA(geneList = oredered_genes.Stage_II,
                                       eps = 0)
 
 ```
+
 ```{r}
 gseaHallmark_res.Stage_III <- GSEA(geneList = oredered_genes.Stage_III,
                                       pvalueCutoff = 0.05,
@@ -440,40 +473,64 @@ gseaHallmark_res.Stage_III <- GSEA(geneList = oredered_genes.Stage_III,
 
 ```
 
+**Significant pathways**
+
+**note about the plots**: When running the GSEA
+analysis, a p-value cutoff of 0.05 was chosen for all of them for
+statistical significance. The plot of the significant pathways in
+stage_I_vs_stage_II was ommited seeing as GSEA has found no significant
+pathways. This is not concerning or suprising, the fact we got
+significant pathways between stage I and stage III is quite suprising.
+
 ```{r}
 # visualize
-
 dotplot(gseaHallmark_res.Tumor, showCategory = 10, split = ".sign", 
         title = "tumor sample enriched patways") +
-   theme_minimal(base_size = 6) + facet_grid(. ~ .sign)
+   theme_minimal(base_size = 10) + facet_grid(. ~ .sign)
+
+#dotplot(gseaHallmark_res.Stage_II, showCategory = 10, split = ".sign", 
+#        title = "tumor sample enriched patways") +
+#   theme_minimal(base_size = 10) + facet_grid(. ~ .sign)
+
+dotplot(gseaHallmark_res.Stage_III, showCategory = 10, split = ".sign", 
+        title = "stage I_vs_III sample enriched patways") +
+   theme_minimal(base_size = 10) + facet_grid(. ~ .sign)
+
 ```
 
 so there are really enriched and supressed genes (mostly supressed it
 seems). but we want to specifically look at the effect on immune
 pathways
 
+**Prediction #2: Immune Pathway Activity**
 
+-   **Prediction**: When talking about the difference between the tumor
+    and non tumor samples, the enrichemnt score can go both ways. It is
+    safe to assume that the 4 pathways will either be highly activated
+    or supressed. And when looking at the different stages, we don't
+    think that much supression or activation will occur.
+-   **Biological reasoning**: As stated before, the difference between
+    tumor and non tumor tissue is massive, so we would expect a massive
+    supression or activation of the immune system ("cold" and "hot"
+    tumors respectively). And when it comes to the cancer stages, we
+    have seen many times that they do not change much themselves.
 
-### Prediction #1:
-A prediction of the enrichment score of these 4 immune pathways can go both ways.
-We would assume that there will be variance, meaning the immune pathways are either supressed or activated.
-As learned during the tutorials, this will point towards the tumor being "hot" or "cold" meaning an active immune environment and a supressed immune environment respectively.
 ```{r}
 enrichplot_Inflammatory_response_Tumor <- enrichplot::gseaplot2(gseaHallmark_res.Tumor, 
                       geneSetID = "HALLMARK_INFLAMMATORY_RESPONSE", 
-                      title = "Inflammatory response Stage Tumor") 
+                      title = "Inflammatory response Tumor") 
 
 enrichplot_Interferon_alpha_response_Tumor <- enrichplot::gseaplot2(gseaHallmark_res.Tumor, 
                       geneSetID = "HALLMARK_INTERFERON_ALPHA_RESPONSE",
-                      title = "Interfron alpha response Stage Tumor")
+                      title = "Interfron alpha response Tumor")
 
 enrichplot_Interferon_gamma_response_Tumor <- enrichplot::gseaplot2(gseaHallmark_res.Tumor, 
                       geneSetID = "HALLMARK_INTERFERON_GAMMA_RESPONSE",
-                      title = "Interfron gamma response Stage Tumor")
+                      title = "Interfron gamma response Tumor")
 
 enrichplot_TNFA_signaling_Tumor <- enrichplot::gseaplot2(gseaHallmark_res.Tumor, 
                       geneSetID = "HALLMARK_TNFA_SIGNALING_VIA_NFKB",
-                      title = "TNFA signaling Stage Tumor")
+                      title = "TNFA signaling Tumor")
 
 
 enrichplot_Inflammatory_response_II <- enrichplot::gseaplot2(gseaHallmark_res.Stage_II, 
@@ -544,16 +601,50 @@ enrichplot_TNFA_signaling_III
 
 ```
 
-all four pathways are an integral part of the immune system. When
-looking at the enrichment score graph, we can see that the genes are
-differentially suppressed in the tumor microenvironment. In this case,
-we say that the tumor is "cold" meaning, it suppresses immune activity.
+* **Result comparison (prediction #2)**: All four pathways are an integral part of the immune system. When
+looking at the enrichment score graph for the tumor_vs_non_tumor, we can
+see that the genes are differentially suppressed in the tumor
+microenvironment. In this case, we say that the tumor is "cold" meaning,
+it suppresses immune activity.
 
-### xCell analysis
+We won't speak too much about the enrichment score of the stage
+comparisons, but it is worth noting serveral things:
 
-so we know that the immune system is suppressed around this tumor. but
-we want to know exactly what cells are suppressed. for that we use
-xCell2 and its immune reference.
+-   While the inflammatory response pathway is supressed in the tumor
+    samples compared to the normal samples. We actually see activation
+    in stage II and stage III compared to stage I.
+-   Stage III has supressed the Interfron ALPHA response pathway more
+    than stage II, while the Interfron GAMMA response pathway plot looks
+    relatively similar between both comparisons
+-   TNFA signaling pathway is just a tad more supressed in Stage III
+    than in Stage II
+
+### Tumor Microenvironment Deconvoluution
+
+**Prediction #3: Immune Cell Supression**
+
+-   **Prediction** Seeing as the 4 immune pathways we chose are
+    supressed around the tumor compared to the normal tissue, we would
+    assume that all if not some of the immune cells connected to that
+    pathway would be supressed. Inflammatory Response: "Macrophages",
+    "Neutrophils", "T-Cells", "B-Cells", "NK-Cells", "D-Cells" Interfron
+    Alpha Response: "NK-Cells", "B-Cells", "T-Cells", "D-Cells"
+    Interfron Gamma Response: "Macrophages", "T Helper Cells", "CD8+
+    Cytotoxic T-Cells", "NK-Cells", "B-Cells", "D-Cells" TNFA signaling:
+    "Macrophages", "T-Cells", "B-Cells", "NK-Cells", "Fibroblasts",
+    "Keratinocytes"
+
+But we predict that the Immune Cell Suppression by the different stages
+of the cancer will not really be present. Because we have seen no major
+contribution of the cancer stage to variability, and we saw that no
+immune pathways were really suppressed (compared to Stage I cancer), and
+they were even activated, that would tell us that the immune cell
+enrichment will be a total mess.
+
+-   **Biological reasoning**: The cells listed above are connected to
+    the pathways we analyzed. And cancer varies a lot between people, so
+    the stages will not really affect the immune cell enrichment, and it
+    should be varied a lot.
 
 ```{r}
 # first we get the normalized  counts from the differential expression
@@ -597,7 +688,7 @@ clean_normalized_counts_matrix.LIHC_Stage <- normalized_counts_matrix.LIHC_Stage
 sum(is.na(rownames(clean_normalized_counts_matrix.LIHC_Stage)))
 ```
 
-
+**run xCell2**
 
 ```{r}
 # start the actual analysis
@@ -613,14 +704,8 @@ xCell_immune_res.LIHC_Stage <- xCell2Analysis(mix = clean_normalized_counts_matr
                                xcell2object = ImmuneCompendium.xCell2Ref)
 ```
 
+**visualize using heatmaps and cutoffs**
 
-### Prediction #2:
-Seeing as the 4 immune pathways we chose are suppressed around the tumor, we would assume that all if not some of the immune cells connected to that pathway would be supressed.
-
-Inflammatory Response: "Macrophages", "Neutrophils", "T-Cells", "B-Cells", "NK-Cells", "D-Cells"
-Interfron Alpha Response: "NK-Cells", "B-Cells", "T-Cells", "D-Cells"
-Interfron Gamma Response: "Macrophages", "T Helper Cells", "CD8+ Cytotoxic T-Cells", "NK-Cells", "B-Cells", "D-Cells"
-TNFA signaling: "Macrophages", "T-Cells", "B-Cells", "NK-Cells", "Fibroblasts", "Keratinocytes"
 ```{r fig.width=8, fig.height=8}
 # lets visualize the results
 
@@ -660,14 +745,11 @@ xCell_Stage_plot <- pheatmap(ordered_xCell2_res,
 
 
 ```
-
-we see a clear immune deactivation in the tumor samples compared to the
-non tumor samples, when looking at: - granulocyte - natural killer cell -
-monocyte - neutrophil - plasmacytoid dendritic cell - non classical
-monocyte - eosinophil - classical nonocyte - basophil and more with
-names too long. 
-by looking at the hierarcial clustering and cutoff, we
-can see that all supressed immune cells are closely related to each
+* **Result comparison (prediction #3)**:We see a clear immune deactivation in the tumor samples compared to the non tumor samples, when looking at: - granulocyte - natural killer
+cell - monocyte - neutrophil - plasmacytoid dendritic cell - non
+classical monocyte - eosinophil - classical nonocyte - basophil and more
+with names too long. by looking at the hierarcial clustering and cutoff,
+we can see that all supressed immune cells are closely related to each
 other. and by asking gemini (don't know what else i can use), these are
 all cells that are a big part of the "innate immune system" who's job is
 to be the "first line of defense" when there is some type of attack.
@@ -676,12 +758,10 @@ Immune System comes in. But with the Innate Immune System being active
 in normal samples and not tumor ones could point maybe towards an immune
 response, but not where the tumor is.
 
-
 ### 2.5 Results:
 
-**Result comparison (prediction #1)**:
-
-**Biological Integration**:
+**Biological Integration**: Although these findings seem bleak, the innate immune system being the one suppressed would mean that treating that supression is a promising candidate for treating the cancer (Oncol Lett. 2020, 'Clinical value of innate immune cells in HCC' section, para. 4).
+While the immunotherapy treatment is dependant on the cancer stage and BCLC staging (Lu, C., Rong, D., Zhang, B., Zheng, W., Wang, X., Chen, Z., & Liu, S. (2024). Current perspectives on the immune microenvironment in hepatocellular carcinoma: From pathogenesis to immunotherapy.), with the combination of the non correlated effect of the cancer stage on the immune system, a better solution might come that treats a wider amount of HCC cases of different stages.
 
 ------------------------------------------------------------------------
 
